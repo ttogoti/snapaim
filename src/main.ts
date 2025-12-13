@@ -216,19 +216,17 @@ function updateBottomHud() {
   const me = players.get(myId);
   if (!me) return;
 
-  // Name + HP text
   hudName.textContent = me.name || myName || "Player";
   hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${START_HP.toLocaleString()} HP`;
 
-  // Clamp HP percent
   const pct = Math.max(0, Math.min(1, me.hp / START_HP));
-
-  // Width
   hpBarInner.style.width = `${pct * 100}%`;
 
-  // Smooth color fade: red (0) -> green (120)
+  // Smooth color fade: red -> green, but FORCE solid fill (no gradients/opacity)
   const hue = pct * 120;
-  hpBarInner.style.backgroundColor = `hsl(${hue}, 85%, 55%)`;
+  hpBarInner.style.backgroundImage = "none";
+  hpBarInner.style.background = `hsl(${hue}, 85%, 55%)`;
+  hpBarInner.style.opacity = "1";
 }
 
 
