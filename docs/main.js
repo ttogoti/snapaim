@@ -13,48 +13,24 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 resize();
+const START_HP = 100000;
 let myId = null;
 let myName = "";
 let hitRadius = 22;
-const START_HP = 100000;
+let ws = null;
+let joined = false;
+let mouseX = window.innerWidth / 2;
+let mouseY = window.innerHeight / 2;
+// Keep a local map of player states (server authority)
 const players = new Map();
+const smooth = new Map();
+// Server URL
 const WS_URL = location.hostname === "localhost"
     ? "ws://localhost:8080"
     : "wss://snapaim.onrender.com";
-let ws = null;
-let joined = false;
-function connect() {
-    ws = new WebSocket(WS_URL);
-    ws.addEventListener("message", (ev) => {
-        const msg = JSON.parse(ev.data);
-        if (msg.t === "welcome") {
-            myId = msg.id;
-            hitRadius = msg.hitRadius ?? hitRadius;
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ t: "setName", name: myName }));
-            }
-            return;
-        }
-        if (msg.t === "state") {
-            for (const p of msg.players)
-                players.set(p.id, p);
-            return;
-        }
-        if (msg.t === "hit") {
-            const target = players.get(msg.to);
-            if (target)
-                target.hp = msg.hp;
-        }
-    });
-}
-// ensure server sees disconnect quickly
-window.addEventListener("beforeunload", () => {
-    try {
-        ws?.close();
-    }
-    catch { }
-});
-// Join flow
+// Heartbeat keeps server position fresh even if pointermove doesn't fire
+let heartbeat = null;
+// --- Join/Menu ---
 nameInput.focus();
 function startGame() {
     if (joined)
@@ -62,6 +38,9 @@ function startGame() {
     joined = true;
     const clean = nameInput.value.trim().slice(0, 18);
     myName = clean.length ? clean : "Player";
+    // Set an initial position so the server isn't stuck at (0,0)
+    mouseX = window.innerWidth / 2;
+    mouseY = window.innerHeight / 2;
     menu.style.display = "none";
     hudBottom.style.display = "block";
     connect();
@@ -72,28 +51,102 @@ nameInput.addEventListener("keydown", (e) => {
         startGame();
     }
 });
-// Input/network
-let mouseX = 0;
-let mouseY = 0;
-let lastSent = 0;
-const SEND_EVERY_MS = 20;
+// --- WebSocket ---
+function connect() {
+    ws = new WebSocket(WS_URL);
+    ws.addEventListener("open", () => {
+        // Heartbeat sends move packets even when stationary
+        heartbeat = window.setInterval(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ t: "move", x: mouseX, y: mouseY }));
+            }
+        }, 50); // 20 Hz
+    });
+    ws.addEventListener("message", (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.t === "welcome") {
+            myId = msg.id;
+            hitRadius = msg.hitRadius ?? hitRadius;
+            // Immediately set name on server
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ t: "setName", name: myName }));
+                // also send a move right away
+                ws.send(JSON.stringify({ t: "move", x: mouseX, y: mouseY }));
+            }
+            return;
+        }
+        if (msg.t === "state") {
+            const list = msg.players;
+            // Update players map
+            for (const p of list) {
+                players.set(p.id, p);
+                // init smoothing for others
+                if (p.id !== myId) {
+                    const s = smooth.get(p.id);
+                    if (!s) {
+                        smooth.set(p.id, { x: p.x, y: p.y, tx: p.x, ty: p.y });
+                    }
+                    else {
+                        s.tx = p.x;
+                        s.ty = p.y;
+                    }
+                }
+            }
+            // Remove smoothing entries for players that no longer exist
+            const alive = new Set(list.map((p) => p.id));
+            for (const id of smooth.keys()) {
+                if (!alive.has(id))
+                    smooth.delete(id);
+            }
+            // Also remove players that vanished
+            for (const id of players.keys()) {
+                if (!alive.has(id))
+                    players.delete(id);
+            }
+            return;
+        }
+        if (msg.t === "hit") {
+            const target = players.get(msg.to);
+            if (target)
+                target.hp = msg.hp;
+            return;
+        }
+    });
+    ws.addEventListener("close", () => {
+        if (heartbeat !== null) {
+            clearInterval(heartbeat);
+            heartbeat = null;
+        }
+    });
+}
+// Ensure close message reaches server quickly
+window.addEventListener("beforeunload", () => {
+    try {
+        ws?.close();
+    }
+    catch { }
+});
+// --- Input ---
+let lastMoveSend = 0;
+const MOVE_SEND_MS = 50; // throttle pointermove sends (heartbeat already handles it)
 window.addEventListener("pointermove", (e) => {
     mouseX = e.clientX;
     mouseY = e.clientY;
     const now = performance.now();
-    if (ws && ws.readyState === WebSocket.OPEN && now - lastSent >= SEND_EVERY_MS) {
-        lastSent = now;
+    if (ws && ws.readyState === WebSocket.OPEN && now - lastMoveSend >= MOVE_SEND_MS) {
+        lastMoveSend = now;
         ws.send(JSON.stringify({ t: "move", x: mouseX, y: mouseY }));
     }
 });
 window.addEventListener("pointerdown", (e) => {
     if (!ws || ws.readyState !== WebSocket.OPEN)
         return;
+    // Send click position; server finds target within radius and applies damage = speed
     ws.send(JSON.stringify({ t: "click", x: e.clientX, y: e.clientY }));
 });
-// Rendering helpers
-function drawHealthBarOverPlayer(x, y, hp) {
-    const w = 74;
+// --- Rendering ---
+function drawOtherHealthBar(x, y, hp) {
+    const w = 78;
     const h = 7;
     const pct = Math.max(0, Math.min(1, hp / START_HP));
     const bx = x - w / 2;
@@ -102,6 +155,10 @@ function drawHealthBarOverPlayer(x, y, hp) {
     ctx.fillRect(bx, by, w, h);
     ctx.fillStyle = "rgba(255,80,80,0.95)";
     ctx.fillRect(bx, by, w * pct, h);
+    // HP number above the bar
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "11px system-ui";
+    ctx.fillText(`${Math.round(hp).toLocaleString()}`, bx, by - 4);
 }
 function updateBottomHud() {
     if (!myId)
@@ -116,23 +173,31 @@ function updateBottomHud() {
 }
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Smooth other players toward their targets
+    const SMOOTH = 0.18;
+    for (const s of smooth.values()) {
+        s.x += (s.tx - s.x) * SMOOTH;
+        s.y += (s.ty - s.y) * SMOOTH;
+    }
+    // Draw everyone EXCEPT you
     for (const p of players.values()) {
-        const isMe = p.id === myId;
-        // ✅ Hide your own on-map visuals
-        if (isMe)
+        if (p.id === myId)
             continue;
-        // other players' hitboxes
+        const s = smooth.get(p.id);
+        const x = s ? s.x : p.x;
+        const y = s ? s.y : p.y;
+        // hitbox circle
         ctx.beginPath();
-        ctx.arc(p.x, p.y, hitRadius, 0, Math.PI * 2);
+        ctx.arc(x, y, hitRadius, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(90,240,150,0.95)";
         ctx.fill();
-        // name for other players
+        // name underneath (only for others)
         ctx.fillStyle = "rgba(255,255,255,0.92)";
         ctx.font = "12px system-ui";
-        const label = p.name || p.id.slice(0, 4);
-        ctx.fillText(label, p.x - Math.min(30, label.length * 3), p.y + hitRadius + 14);
-        // hp bar above other players
-        drawHealthBarOverPlayer(p.x, p.y, p.hp);
+        const label = (p.name && p.name.trim().length) ? p.name : p.id.slice(0, 4);
+        ctx.fillText(label, x - Math.min(30, label.length * 3), y + hitRadius + 14);
+        // bar + hp number above
+        drawOtherHealthBar(x, y, p.hp);
     }
     updateBottomHud();
     requestAnimationFrame(loop);
