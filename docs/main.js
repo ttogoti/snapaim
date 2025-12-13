@@ -14,7 +14,7 @@ const players = new Map();
 // IMPORTANT: when deployed, replace with your hosted wss:// URL
 const WS_URL = location.hostname === "localhost"
     ? "ws://localhost:8080"
-    : "wss://YOUR_SERVER_HOST_HERE"; // <- replace after deploying server
+    : "wss://snapaim.onrender.com"; // <- replace after deploying server
 const ws = new WebSocket(WS_URL);
 ws.addEventListener("message", (ev) => {
     const msg = JSON.parse(ev.data);
