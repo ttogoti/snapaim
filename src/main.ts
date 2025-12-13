@@ -25,20 +25,16 @@ const START_HP = 100_000;
 
 const players = new Map<string, PlayerState>();
 
-// Use your Render server for everyone (except local dev)
 const WS_URL =
   location.hostname === "localhost"
     ? "ws://localhost:8080"
     : "wss://snapaim.onrender.com";
 
 let ws: WebSocket | null = null;
+let joined = false;
 
 function connect() {
   ws = new WebSocket(WS_URL);
-
-  ws.addEventListener("open", () => {
-    // nothing yet; we wait for welcome
-  });
 
   ws.addEventListener("message", (ev) => {
     const msg = JSON.parse(ev.data);
@@ -47,7 +43,6 @@ function connect() {
       myId = msg.id;
       hitRadius = msg.hitRadius ?? hitRadius;
 
-      // send username immediately after welcome
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ t: "setName", name: myName }));
       }
@@ -55,9 +50,7 @@ function connect() {
     }
 
     if (msg.t === "state") {
-      for (const p of msg.players as PlayerState[]) {
-        players.set(p.id, p);
-      }
+      for (const p of msg.players as PlayerState[]) players.set(p.id, p);
       return;
     }
 
@@ -66,36 +59,37 @@ function connect() {
       if (target) target.hp = msg.hp;
     }
   });
-
-  ws.addEventListener("close", () => {
-    // optional: could show menu again, but keep it simple
-  });
-
-  ws.addEventListener("error", () => {
-    // optional: show some UI; keeping minimal
-  });
 }
 
-// --- Join flow ---
+// ensure server sees disconnect quickly
+window.addEventListener("beforeunload", () => {
+  try { ws?.close(); } catch {}
+});
+
+// Join flow
 nameInput.focus();
 
 function startGame() {
+  if (joined) return;
+  joined = true;
+
   const clean = nameInput.value.trim().slice(0, 18);
   myName = clean.length ? clean : "Player";
 
-  // hide menu, show HUD
   menu.style.display = "none";
   hudBottom.style.display = "block";
 
-  // connect after you press enter
   connect();
 }
 
 nameInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") startGame();
+  if (e.key === "Enter") {
+    e.preventDefault();
+    startGame();
+  }
 });
 
-// --- Input + networking ---
+// Input/network
 let mouseX = 0;
 let mouseY = 0;
 
@@ -118,16 +112,16 @@ window.addEventListener("pointerdown", (e) => {
   ws.send(JSON.stringify({ t: "click", x: e.clientX, y: e.clientY }));
 });
 
-// --- Rendering ---
+// Rendering helpers
 function drawHealthBarOverPlayer(x: number, y: number, hp: number) {
-  const w = 70;
-  const h = 8;
+  const w = 74;
+  const h = 7;
   const pct = Math.max(0, Math.min(1, hp / START_HP));
 
   const bx = x - w / 2;
   const by = y - hitRadius - 18;
 
-  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
   ctx.fillRect(bx, by, w, h);
 
   ctx.fillStyle = "rgba(255,80,80,0.95)";
@@ -150,19 +144,24 @@ function loop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   for (const p of players.values()) {
-    // hitbox circle
+    const isMe = p.id === myId;
+
+    // ✅ Hide your own on-map visuals
+    if (isMe) continue;
+
+    // other players' hitboxes
     ctx.beginPath();
     ctx.arc(p.x, p.y, hitRadius, 0, Math.PI * 2);
-    ctx.fillStyle = p.id === myId ? "rgba(80,160,255,0.95)" : "rgba(90,240,150,0.95)";
+    ctx.fillStyle = "rgba(90,240,150,0.95)";
     ctx.fill();
 
-    // name (replace YOU with username)
-    ctx.fillStyle = "white";
+    // name for other players
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
     ctx.font = "12px system-ui";
-    const label = p.name || (p.id === myId ? myName : p.id.slice(0, 4));
+    const label = p.name || p.id.slice(0, 4);
     ctx.fillText(label, p.x - Math.min(30, label.length * 3), p.y + hitRadius + 14);
 
-    // small bar above hitbox
+    // hp bar above other players
     drawHealthBarOverPlayer(p.x, p.y, p.hp);
   }
 

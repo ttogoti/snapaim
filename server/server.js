@@ -3,19 +3,18 @@ import { randomUUID } from "crypto";
 
 const PORT = Number(process.env.PORT || 8080);
 
-// Game rules
 const START_HP = 100000;
-const HIT_RADIUS = 22;          // cursor hitbox radius (px)
-const HISTORY_MS = 250;         // keep ~250ms of movement samples
-const SPEED_WINDOW_MS = 120;    // compute speed over last ~120ms
+const HIT_RADIUS = 22;
+const HISTORY_MS = 250;
+const SPEED_WINDOW_MS = 120;
 
-// Safety clamp (optional). Damage = speed, but prevents teleport-cheat nukes.
-// If you truly want unlimited, set this to a huge number.
 const MAX_DAMAGE = 100000;
+
+// if we haven't heard from a client in this long, kick them
+const STALE_MS = 8000;
 
 const players = new Map();
 
-/** helpers */
 function now() { return Date.now(); }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
@@ -33,7 +32,6 @@ function speedPxPerSec(p, tEnd) {
     if (s.t >= tStart && !first) first = s;
     if (s.t <= tEnd) last = s;
   }
-
   if (!first || !last || last.t === first.t) return 0;
 
   const d = dist(first.p, last.p);
@@ -58,7 +56,6 @@ function snapshot() {
   }));
 }
 
-/** websocket server */
 const wss = new WebSocketServer({ port: PORT });
 
 wss.on("connection", (ws) => {
@@ -68,31 +65,25 @@ wss.on("connection", (ws) => {
   const p = {
     id,
     ws,
-    name: "Player",              // ✅ username support
+    name: "Player",
     pos: { x: 0, y: 0 },
     hp: START_HP,
-    history: [{ t, p: { x: 0, y: 0 } }]
+    history: [{ t, p: { x: 0, y: 0 } }],
+    lastSeen: t
   };
 
   players.set(id, p);
 
-  // send welcome to this client
-  ws.send(JSON.stringify({
-    t: "welcome",
-    id,
-    hp: START_HP,
-    hitRadius: HIT_RADIUS
-  }));
-
-  // broadcast full state to everyone (includes new player)
+  ws.send(JSON.stringify({ t: "welcome", id, hp: START_HP, hitRadius: HIT_RADIUS }));
   broadcast({ t: "state", players: snapshot() });
 
   ws.on("message", (raw) => {
     let msg;
     try { msg = JSON.parse(raw.toString("utf8")); } catch { return; }
-    const tNow = now();
 
-    // ✅ setName message (username)
+    const tNow = now();
+    p.lastSeen = tNow;
+
     if (msg.t === "setName") {
       if (typeof msg.name !== "string") return;
       const clean = msg.name.trim().slice(0, 18);
@@ -101,29 +92,23 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    // cursor movement
     if (msg.t === "move") {
       if (typeof msg.x !== "number" || typeof msg.y !== "number") return;
-
       p.pos = { x: msg.x, y: msg.y };
       p.history.push({ t: tNow, p: { x: msg.x, y: msg.y } });
       pruneHistory(p, tNow);
       return;
     }
 
-    // click / hit attempt
     if (msg.t === "click") {
-      // Damage = server-measured speed (px/s)
       const spd = speedPxPerSec(p, tNow);
       let dmg = Math.round(spd);
       dmg = clamp(dmg, 0, MAX_DAMAGE);
 
-      // click position (use provided coords if present)
       const clickPos = (typeof msg.x === "number" && typeof msg.y === "number")
         ? { x: msg.x, y: msg.y }
         : p.pos;
 
-      // find nearest target within HIT_RADIUS of clickPos
       let target = null;
       let best = Infinity;
 
@@ -135,20 +120,11 @@ wss.on("connection", (ws) => {
           target = other;
         }
       }
-
       if (!target) return;
 
       target.hp = Math.max(0, target.hp - dmg);
 
-      broadcast({
-        t: "hit",
-        from: p.id,
-        to: target.id,
-        dmg,
-        hp: target.hp
-      });
-
-      return;
+      broadcast({ t: "hit", from: p.id, to: target.id, dmg, hp: target.hp });
     }
   });
 
@@ -158,7 +134,21 @@ wss.on("connection", (ws) => {
   });
 });
 
-// broadcast state at ~30fps so everyone sees smooth movement
+// state updates
 setInterval(() => broadcast({ t: "state", players: snapshot() }), 1000 / 30);
+
+// stale cleanup
+setInterval(() => {
+  const t = now();
+  let changed = false;
+  for (const [id, p] of players) {
+    if (t - p.lastSeen > STALE_MS) {
+      try { p.ws.terminate?.(); } catch {}
+      players.delete(id);
+      changed = true;
+    }
+  }
+  if (changed) broadcast({ t: "state", players: snapshot() });
+}, 1000);
 
 console.log(`Server running on ws://localhost:${PORT}`);

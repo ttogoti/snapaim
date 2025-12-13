@@ -6,98 +6,109 @@
     <title>SnapAim</title>
     <style>
       :root { color-scheme: dark; }
-      html, body { margin: 0; height: 100%; overflow: hidden; background: #0f1115; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #111318; }
       canvas { display: block; }
 
-      /* --- Join menu --- */
+      /* Simple menu (diep-ish) */
       #menu {
         position: fixed; inset: 0;
         display: grid; place-items: center;
-        background: radial-gradient(1200px 800px at 50% 40%, rgba(40,60,120,0.25), rgba(0,0,0,0.75));
+        background: radial-gradient(900px 600px at 50% 40%, rgba(70,90,140,.18), rgba(0,0,0,.75));
         z-index: 10;
       }
-      #menuCard{
+      #menuBox {
         width: min(420px, 92vw);
-        padding: 18px 18px 14px;
-        border-radius: 16px;
-        background: rgba(0,0,0,0.65);
-        border: 1px solid rgba(255,255,255,0.08);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-        font: 14px system-ui, -apple-system, Segoe UI, Roboto, Arial;
-        color: #fff;
+        padding: 14px 14px 12px;
+        border-radius: 10px;
+        background: rgba(0,0,0,.55);
+        border: 1px solid rgba(255,255,255,.08);
+        font: 13px system-ui, -apple-system, Segoe UI, Roboto, Arial;
+        color: rgba(255,255,255,.92);
       }
-      #menuCard h1{ margin: 0 0 8px; font-size: 18px; }
-      #menuCard p{ margin: 0 0 12px; opacity: 0.8; line-height: 1.3; }
+      #titleRow{
+        display:flex;
+        align-items:baseline;
+        justify-content:space-between;
+        margin-bottom:10px;
+      }
+      #titleRow b{ font-size: 14px; letter-spacing: .5px; }
+      #titleRow span{ opacity:.7; font-size: 12px; }
+
       #nameInput{
         width: 100%;
         box-sizing: border-box;
-        padding: 12px 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(255,255,255,0.12);
-        background: rgba(15,17,21,0.9);
-        color: #fff;
+        padding: 10px 10px;
+        border-radius: 6px;
+        border: 1px solid rgba(255,255,255,.10);
+        background: rgba(18,20,26,.85);
+        color: rgba(255,255,255,.92);
         outline: none;
-        font-size: 14px;
       }
-      #menuHint{ margin-top: 10px; opacity: 0.7; font-size: 12px; }
+      #menuHelp{
+        margin-top: 8px;
+        opacity: .70;
+        font-size: 12px;
+        line-height: 1.3;
+      }
 
-      /* --- Bottom HUD --- */
+      /* Bottom HUD (your HP only) */
       #hudBottom {
         position: fixed;
         left: 0; right: 0; bottom: 0;
-        padding: 12px 14px 16px;
-        display: none; /* shown after join */
+        padding: 10px 12px 12px;
+        display: none;
         z-index: 5;
         pointer-events: none;
-        font: 14px system-ui, -apple-system, Segoe UI, Roboto, Arial;
-        color: #fff;
+        font: 13px system-ui, -apple-system, Segoe UI, Roboto, Arial;
+        color: rgba(255,255,255,.92);
       }
       #hudInner{
-        width: min(820px, 96vw);
+        width: min(860px, 96vw);
         margin: 0 auto;
-        padding: 12px 14px;
-        border-radius: 14px;
-        background: rgba(0,0,0,0.55);
-        border: 1px solid rgba(255,255,255,0.08);
-        backdrop-filter: blur(6px);
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: rgba(0,0,0,.50);
+        border: 1px solid rgba(255,255,255,.08);
       }
       #hudRow{
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 12px;
+        display:flex;
+        align-items:baseline;
+        justify-content:space-between;
       }
-      #hudName{ font-weight: 800; font-size: 16px; }
-      #hudHpText{ opacity: 0.9; font-variant-numeric: tabular-nums; }
+      #hudName{ font-weight: 700; }
+      #hudHpText{ opacity:.85; font-variant-numeric: tabular-nums; }
 
       #hpBarOuter{
-        margin-top: 10px;
-        height: 18px;
+        margin-top: 8px;
+        height: 14px;
         border-radius: 999px;
-        background: rgba(255,255,255,0.08);
+        background: rgba(255,255,255,.08);
         overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.10);
+        border: 1px solid rgba(255,255,255,.10);
       }
       #hpBarInner{
-        height: 100%;
-        width: 100%;
-        background: linear-gradient(90deg, rgba(255,80,80,0.95), rgba(255,150,80,0.95));
+        height:100%;
+        width:100%;
+        background: linear-gradient(90deg, rgba(255,80,80,.95), rgba(255,170,80,.95));
       }
     </style>
   </head>
 
   <body>
-    <!-- Join Menu -->
     <div id="menu">
-      <div id="menuCard">
-        <h1>SnapAim</h1>
-        <p>Enter a username, press <b>Enter</b>, then move & click to fight.</p>
-        <input id="nameInput" maxlength="18" placeholder="Username (max 18 chars)" autocomplete="off" />
-        <div id="menuHint">Tip: on free Render, the server may “wake up” the first time.</div>
+      <div id="menuBox">
+        <div id="titleRow">
+          <b>SNAPAIM</b>
+          <span>press Enter</span>
+        </div>
+        <input id="nameInput" maxlength="18" placeholder="username" autocomplete="off" />
+        <div id="menuHelp">
+          Move to aim. Click to hit. Damage = speed.<br>
+          (Free server may sleep; first load can be slow.)
+        </div>
       </div>
     </div>
 
-    <!-- Bottom HUD (your HP) -->
     <div id="hudBottom">
       <div id="hudInner">
         <div id="hudRow">
