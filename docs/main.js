@@ -154,15 +154,9 @@ function drawOtherHealthBar(x, y, hp) {
     // background
     ctx.fillStyle = "rgba(0,0,0,0.65)";
     ctx.fillRect(bx, by, w, h);
-    // color based on HP %
-    let color;
-    if (pct > 0.6)
-        color = "#3ddc84"; // green
-    else if (pct > 0.3)
-        color = "#f5c542"; // yellow
-    else
-        color = "#ff4d4d"; // red
-    ctx.fillStyle = color;
+    // smooth color fade: red (0) -> green (120)
+    const hue = pct * 120;
+    ctx.fillStyle = `hsl(${hue}, 85%, 55%)`;
     ctx.fillRect(bx, by, w * pct, h);
     // HP number above bar
     ctx.fillStyle = "rgba(255,255,255,0.9)";
@@ -175,10 +169,16 @@ function updateBottomHud() {
     const me = players.get(myId);
     if (!me)
         return;
+    // Name + HP text
     hudName.textContent = me.name || myName || "Player";
     hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${START_HP.toLocaleString()} HP`;
+    // Clamp HP percent
     const pct = Math.max(0, Math.min(1, me.hp / START_HP));
+    // Width
     hpBarInner.style.width = `${pct * 100}%`;
+    // Smooth color fade: red (0) -> green (120)
+    const hue = pct * 120;
+    hpBarInner.style.backgroundColor = `hsl(${hue}, 85%, 55%)`;
 }
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
