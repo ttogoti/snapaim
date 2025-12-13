@@ -188,17 +188,29 @@ function drawOtherHealthBar(x: number, y: number, hp: number) {
   const bx = x - w / 2;
   const by = y - hitRadius - 18;
 
+  // background
   ctx.fillStyle = "rgba(0,0,0,0.65)";
   ctx.fillRect(bx, by, w, h);
 
-  ctx.fillStyle = "rgba(255,80,80,0.95)";
+  // color based on HP %
+  let color: string;
+  if (pct > 0.6) color = "#3ddc84";       // green
+  else if (pct > 0.3) color = "#f5c542";  // yellow
+  else color = "#ff4d4d";                 // red
+
+  ctx.fillStyle = color;
   ctx.fillRect(bx, by, w * pct, h);
 
-  // HP number above the bar
+  // HP number above bar
   ctx.fillStyle = "rgba(255,255,255,0.9)";
   ctx.font = "11px system-ui";
-  ctx.fillText(`${Math.round(hp).toLocaleString()}`, bx, by - 4);
+  ctx.fillText(
+    `${Math.round(hp).toLocaleString()}`,
+    bx,
+    by - 4
+  );
 }
+
 
 function updateBottomHud() {
   if (!myId) return;
