@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 
 const PORT = Number(process.env.PORT || 8080);
 
-const START_HP = 100000;
+const START_HP = 10000;
 const HIT_RADIUS = 22;
 const HISTORY_MS = 250;
 const SPEED_WINDOW_MS = 120;
