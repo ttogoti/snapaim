@@ -180,7 +180,7 @@ window.addEventListener("pointerdown", (e) => {
 });
 
 // --- Rendering ---
-  function drawOtherHealthBar(x: number, y: number, hp: number) {
+function drawOtherHealthBar(x: number, y: number, hp: number) {
   const w = 70;
   const h = 15;
   const pct = Math.max(0, Math.min(1, hp / START_HP));
@@ -201,44 +201,19 @@ window.addEventListener("pointerdown", (e) => {
   ctx.fillStyle = color;
   ctx.fillRect(bx, by, w * pct, h);
 
-    // HP number INSIDE the bar (centered)
+  // HP number INSIDE the bar (centered) — NO OUTLINE
   const text = Math.round(hp).toLocaleString();
 
   ctx.font = "9px Ubuntu, system-ui";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-
-    // black outline
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(0,0,0,0.9)";
-  ctx.strokeText(
-    text,
-    bx + w / 2,
-    by + h / 2
-  );
-
-// white fill on top
   ctx.fillStyle = "rgba(255,255,255,0.95)";
-  ctx.fillText(
-    text,
-    bx + w / 2,
-    by + h / 2
-  );
+  ctx.fillText(text, bx + w / 2, by + h / 2);
 
-// reset state (important)
-  ctx.lineWidth = 1;
-  ctx.textAlign = "start";
-  ctx.textBaseline = "alphabetic";
-
-
-  // reset alignment (important so other text isn't broken)
+  // reset alignment
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
 }
-
-
-
-
 
 function updateBottomHud() {
   if (!myId) return;
@@ -258,7 +233,6 @@ function updateBottomHud() {
   hpBarInner.style.background = `hsl(${hue}, 85%, 55%)`;
   hpBarInner.style.opacity = "1";
 }
-
 
 function loop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -284,11 +258,26 @@ function loop() {
     ctx.fillStyle = "rgba(90,240,150,0.95)";
     ctx.fill();
 
-    // name underneath (only for others)
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.font = "12px system-ui";
+    // name underneath (only for others) — THICK DARK GREY OUTLINE
     const label = (p.name && p.name.trim().length) ? p.name : p.id.slice(0, 4);
-    ctx.fillText(label, x - Math.min(30, label.length * 3), y + hitRadius + 14);
+
+    ctx.font = "12px Ubuntu, system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+
+    // outline first
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(55,55,55,0.95)";
+    ctx.strokeText(label, x, y + hitRadius + 14);
+
+    // then fill
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.fillText(label, x, y + hitRadius + 14);
+
+    // reset state
+    ctx.lineWidth = 1;
+    ctx.textAlign = "start";
+    ctx.textBaseline = "alphabetic";
 
     // bar + hp number above
     drawOtherHealthBar(x, y, p.hp);
