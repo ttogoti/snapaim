@@ -35,12 +35,42 @@ function msgType(msg) {
 function wsSend(payload) {
     if (!ws || ws.readyState !== WebSocket.OPEN)
         return;
+    // keep compatibility between {t:"..."} and {type:"..."}
     const out = { ...payload };
     if (out.t && !out.type)
         out.type = out.t;
     if (out.type && !out.t)
         out.t = out.type;
     ws.send(JSON.stringify(out));
+}
+// -------- Respawn / Reset --------
+function resetToMenu() {
+    // stop heartbeat
+    if (heartbeat !== null) {
+        clearInterval(heartbeat);
+        heartbeat = null;
+    }
+    // close ws
+    try {
+        ws?.close();
+    }
+    catch { }
+    ws = null;
+    // reset state
+    joined = false;
+    myId = null;
+    myMaxHp = null;
+    players.clear();
+    smooth.clear();
+    // UI back to menu
+    hudBottom.style.display = "none";
+    menu.style.display = "flex";
+    // reset HUD text
+    hudName.textContent = "";
+    hudHpText.textContent = "";
+    hpBarInner.style.width = "0%";
+    nameInput.value = "";
+    nameInput.focus();
 }
 // --- Join/Menu ---
 nameInput.focus();
@@ -83,6 +113,11 @@ function connect() {
     ws.addEventListener("message", (ev) => {
         const msg = JSON.parse(ev.data);
         const t = msgType(msg);
+        // Server tells you you're dead -> reset to menu (respawn flow)
+        if (t === "dead") {
+            resetToMenu();
+            return;
+        }
         if (t === "welcome") {
             myId = typeof msg.id === "string" ? msg.id : myId;
             hitRadius = typeof msg.hitRadius === "number" ? msg.hitRadius : hitRadius;
@@ -118,14 +153,14 @@ function connect() {
             }
             // If we have myId, lock myMaxHp from my own state (server authority)
             if (myId) {
-                const me = list.find((p) => p.id === myId);
-                if (me) {
-                    if (typeof me.maxHp === "number" && me.maxHp > 0) {
-                        myMaxHp = me.maxHp;
+                const meFromList = list.find((p) => p.id === myId);
+                if (meFromList) {
+                    if (typeof meFromList.maxHp === "number" && meFromList.maxHp > 0) {
+                        myMaxHp = meFromList.maxHp;
                     }
-                    else if (myMaxHp === null && typeof me.hp === "number" && me.hp > 0) {
+                    else if (myMaxHp === null && typeof meFromList.hp === "number" && meFromList.hp > 0) {
                         // fallback for older servers
-                        myMaxHp = me.hp;
+                        myMaxHp = meFromList.hp;
                     }
                 }
             }
@@ -137,6 +172,14 @@ function connect() {
             for (const id of players.keys())
                 if (!alive.has(id))
                     players.delete(id);
+            // Fallback: if your HP hits 0 (or you disappear), reset to menu
+            if (myId) {
+                const me = players.get(myId);
+                if (!me || me.hp <= 0) {
+                    resetToMenu();
+                    return;
+                }
+            }
             return;
         }
         if (t === "hit") {
@@ -155,6 +198,15 @@ function connect() {
             clearInterval(heartbeat);
             heartbeat = null;
         }
+        // If we were in-game and connection drops (server killed us or restart), go back to menu.
+        if (joined) {
+            resetToMenu();
+        }
+    });
+    ws.addEventListener("error", () => {
+        // treat errors like disconnects
+        if (joined)
+            resetToMenu();
     });
 }
 // --- Input ---
