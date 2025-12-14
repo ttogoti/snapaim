@@ -18,7 +18,7 @@ resize();
 
 type PlayerState = { id: string; name: string; x: number; y: number; hp: number };
 
-const START_HP = 100_000;
+const START_HP = 10_000;
 
 let myId: string | null = null;
 let myName = "";

@@ -13,7 +13,7 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 resize();
-const START_HP = 100000;
+const START_HP = 10000;
 let myId = null;
 let myName = "";
 let hitRadius = 22;
