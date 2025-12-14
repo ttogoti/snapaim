@@ -1,5 +1,3 @@
-console.log("BUILD_MARKER_1");
-
 const canvas = document.getElementById("c") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
@@ -12,11 +10,9 @@ const hudName = document.getElementById("hudName") as HTMLDivElement;
 const hudHpText = document.getElementById("hudHpText") as HTMLDivElement;
 const hpBarInner = document.getElementById("hpBarInner") as HTMLDivElement;
 
-// Speed bar (DOM, classic)
 const speedBarInner = document.getElementById("speedBarInner") as HTMLDivElement;
 const hudSpeedText = document.getElementById("hudSpeedText") as HTMLDivElement;
 
-// Death screen (DOM)
 const deathScreen = document.getElementById("deathScreen") as HTMLDivElement;
 const deathBig = document.getElementById("deathBig") as HTMLDivElement;
 const continueBtn = document.getElementById("continueBtn") as HTMLButtonElement;
@@ -47,7 +43,6 @@ let joined = false;
 let mouseX = window.innerWidth / 2;
 let mouseY = window.innerHeight / 2;
 
-// server-authoritative max HP for MY player (set ONLY from welcome/state)
 let myMaxHp: number | null = null;
 
 const players = new Map<string, PlayerState>();
@@ -69,7 +64,6 @@ function msgType(msg: any): string | undefined {
 function wsSend(payload: any) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-  // keep compatibility between {t:"..."} and {type:"..."}
   const out = { ...payload };
   if (out.t && !out.type) out.type = out.t;
   if (out.type && !out.t) out.t = out.type;
@@ -77,18 +71,14 @@ function wsSend(payload: any) {
   ws.send(JSON.stringify(out));
 }
 
-/* =========================
-   SPEED BAR CONFIG
-   ========================= */
-const SPEED_MAX = 2000; // px/s => full bar => die
+const SPEED_MAX = 2000;
 let lastSpeedT = performance.now();
 let lastSpeedX = mouseX;
 let lastSpeedY = mouseY;
 let smoothSpeed = 0;
 
-// prevents instant death on join / first-frame jitter
 let joinTimeMs = performance.now();
-const SPEED_GRACE_MS = 650; // ignore speed-kill for first 0.65s
+const SPEED_GRACE_MS = 650;
 
 function resetSpeedSampler() {
   lastSpeedT = performance.now();
@@ -98,7 +88,7 @@ function resetSpeedSampler() {
 
   speedBarInner.style.width = "0%";
   speedBarInner.style.backgroundImage = "none";
-  speedBarInner.style.background = "hsl(60, 95%, 55%)"; // yellow
+  speedBarInner.style.background = "hsl(60, 95%, 55%)";
   speedBarInner.style.opacity = "1";
   hudSpeedText.textContent = `Speed: 0/${SPEED_MAX}`;
 }
@@ -112,9 +102,8 @@ function updateSpeedFromMouse() {
   const dy = mouseY - lastSpeedY;
   const d = Math.hypot(dx, dy);
 
-  const instant = (d / dt) * 1000; // px/s
+  const instant = (d / dt) * 1000;
 
-  // smooth up/down
   const alpha = 0.18;
   smoothSpeed += (instant - smoothSpeed) * alpha;
 
@@ -127,18 +116,15 @@ function updateSpeedFromMouse() {
 
   speedBarInner.style.width = `${pct * 100}%`;
 
-  // Yellow (60) -> Red (0)
   const hue = 60 - pct * 60;
   speedBarInner.style.background = `hsl(${hue}, 95%, 55%)`;
 
   hudSpeedText.textContent = `Speed: ${Math.round(clamped)}/${SPEED_MAX}`;
 
-  // local death (speed)
-  if (joined && (tNow - joinTimeMs) > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
+  if (joined && tNow - joinTimeMs > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
     showDeathScreen("Speed");
   }
 }
-/* ========================= */
 
 let lastKillerName: string | null = null;
 
@@ -147,15 +133,15 @@ function stopConnection() {
     clearInterval(heartbeat);
     heartbeat = null;
   }
-  try { ws?.close(); } catch {}
+  try {
+    ws?.close();
+  } catch {}
   ws = null;
 }
 
 function showDeathScreen(killedBy: string) {
-  // freeze networking + hide HUD, but keep canvas visible behind overlay
   stopConnection();
 
-  // Keep world visible for a moment (we do NOT clear canvas here)
   hudBottom.style.display = "none";
   menu.style.display = "none";
 
@@ -164,10 +150,8 @@ function showDeathScreen(killedBy: string) {
 }
 
 function resetToMenu() {
-  // close ws + timers
   stopConnection();
 
-  // reset state
   joined = false;
   myId = null;
   myMaxHp = null;
@@ -175,10 +159,8 @@ function resetToMenu() {
   players.clear();
   smooth.clear();
 
-  // reset speed
   resetSpeedSampler();
 
-  // UI
   deathScreen.style.display = "none";
   hudBottom.style.display = "none";
   menu.style.display = "flex";
@@ -195,7 +177,6 @@ continueBtn.addEventListener("click", () => {
   resetToMenu();
 });
 
-// --- Join/Menu ---
 nameInput.focus();
 
 function startGame() {
@@ -208,16 +189,13 @@ function startGame() {
   mouseX = window.innerWidth / 2;
   mouseY = window.innerHeight / 2;
 
-  // initialize speed sampler + grace timer
   joinTimeMs = performance.now();
   resetSpeedSampler();
 
-  // hide overlays, show HUD
   deathScreen.style.display = "none";
   menu.style.display = "none";
   hudBottom.style.display = "flex";
 
-  // UI feedback immediately
   hudName.textContent = myName || "Loading...";
   hudHpText.textContent = "Connecting/Finding a server...";
   hpBarInner.style.width = "100%";
@@ -237,12 +215,10 @@ nameInput.addEventListener("keydown", (e) => {
   }
 });
 
-// --- WebSocket ---
 function connect() {
   ws = new WebSocket(WS_URL);
 
   ws.addEventListener("open", () => {
-    // heartbeat keeps server position fresh
     heartbeat = window.setInterval(() => {
       wsSend({ t: "move", x: mouseX, y: mouseY });
     }, 50);
@@ -255,9 +231,7 @@ function connect() {
     const msg = JSON.parse(ev.data);
     const t = msgType(msg);
 
-    // server death message (authoritative)
     if (t === "dead") {
-      // if server includes byName, use it; otherwise fallback to last known killer
       const byName = typeof msg.byName === "string" ? msg.byName : null;
       showDeathScreen(byName ?? lastKillerName ?? "Unknown");
       return;
@@ -267,7 +241,6 @@ function connect() {
       myId = typeof msg.id === "string" ? msg.id : myId;
       hitRadius = typeof msg.hitRadius === "number" ? msg.hitRadius : hitRadius;
 
-      // max HP from server
       if (typeof msg.maxHp === "number" && msg.maxHp > 0) {
         myMaxHp = msg.maxHp;
       } else if (typeof msg.hp === "number" && msg.hp > 0 && myMaxHp === null) {
@@ -301,7 +274,11 @@ function connect() {
         if (meFromList) {
           if (typeof meFromList.maxHp === "number" && meFromList.maxHp > 0) {
             myMaxHp = meFromList.maxHp;
-          } else if (myMaxHp === null && typeof meFromList.hp === "number" && meFromList.hp > 0) {
+          } else if (
+            myMaxHp === null &&
+            typeof meFromList.hp === "number" &&
+            meFromList.hp > 0
+          ) {
             myMaxHp = meFromList.hp;
           }
         }
@@ -311,7 +288,6 @@ function connect() {
       for (const id of smooth.keys()) if (!alive.has(id)) smooth.delete(id);
       for (const id of players.keys()) if (!alive.has(id)) players.delete(id);
 
-      // If you disappeared or hit 0 without "dead" message, show death screen using best guess
       if (myId) {
         const me = players.get(myId);
         if (!me || me.hp <= 0) {
@@ -327,20 +303,18 @@ function connect() {
       const to = msg.to ?? msg.target ?? msg.id;
       const hp = msg.hp ?? msg.newHp ?? msg.health;
 
-      // update hp locally for the target
       if (typeof to === "string" && typeof hp === "number") {
         const target = players.get(to);
         if (target) target.hp = hp;
       }
 
-      // if YOU got hit, remember who did it for the death screen
       if (myId && to === myId) {
         const from = msg.from;
         if (typeof from === "string") {
           const killer = players.get(from);
-          lastKillerName = (killer?.name && killer.name.trim().length) ? killer.name : from.slice(0, 4);
+          lastKillerName =
+            killer?.name && killer.name.trim().length ? killer.name : from.slice(0, 4);
         }
-        // if it killed you and server doesn t send "dead", still show it
         if (typeof hp === "number" && hp <= 0) {
           showDeathScreen(lastKillerName ?? "Unknown");
         }
@@ -355,7 +329,6 @@ function connect() {
       clearInterval(heartbeat);
       heartbeat = null;
     }
-    // Don t force menu here   death screen handles it. If it was a random disconnect, send them to menu.
     if (joined && deathScreen.style.display !== "flex") {
       resetToMenu();
     }
@@ -366,7 +339,6 @@ function connect() {
   });
 }
 
-// --- Input ---
 let lastMoveSend = 0;
 const MOVE_SEND_MS = 50;
 
@@ -374,7 +346,6 @@ window.addEventListener("pointermove", (e) => {
   mouseX = e.clientX;
   mouseY = e.clientY;
 
-  // speed meter
   updateSpeedFromMouse();
 
   const now = performance.now();
@@ -389,7 +360,6 @@ window.addEventListener("pointerdown", (e) => {
   wsSend({ t: "click", x: e.clientX, y: e.clientY });
 });
 
-// --- Rendering helpers ---
 function maxHpForPlayer(p: PlayerState) {
   if (typeof p.maxHp === "number" && p.maxHp > 0) return p.maxHp;
   if (myMaxHp !== null && myMaxHp > 0) return myMaxHp;
@@ -449,10 +419,12 @@ function updateBottomHud() {
   const me = players.get(myId);
   if (!me) return;
 
-  const maxHp = (myMaxHp !== null && myMaxHp > 0) ? myMaxHp : maxHpForPlayer(me);
+  const maxHp = myMaxHp !== null && myMaxHp > 0 ? myMaxHp : maxHpForPlayer(me);
 
   hudName.textContent = me.name || myName || "Player";
-  hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${Math.round(maxHp).toLocaleString()} HP`;
+  hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${Math.round(
+    maxHp
+  ).toLocaleString()} HP`;
 
   const pct = Math.max(0, Math.min(1, me.hp / maxHp));
   hpBarInner.style.width = `${pct * 100}%`;
@@ -485,7 +457,7 @@ function loop() {
     ctx.fillStyle = "rgba(90,240,150,0.95)";
     ctx.fill();
 
-    const label = (p.name && p.name.trim().length) ? p.name : p.id.slice(0, 4);
+    const label = p.name && p.name.trim().length ? p.name : p.id.slice(0, 4);
 
     ctx.font = "12px Ubuntu, system-ui";
     ctx.textAlign = "center";
