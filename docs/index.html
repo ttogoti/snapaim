@@ -93,14 +93,20 @@
         calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * -0.9) var(--outline);
     }
 
-    /* Play button — SAME SIZE as input, GREY */
+      /* Play button — custom red-box size */
+      /* Play button — custom red-box size */
     #playBtn {
-      width: var(--menuW);
-      height: 66px;
+      width: 320px;          /* THIS is the red-box width */
+      height: 48px;
+
+      margin-top: 22px;     /* pushes it further down ON PURPOSE */
+      align-self: center;   /* keeps it centered under the input */
+
       border-radius: var(--uiRadius);
       border: 0.5px solid rgba(0,0,0,0.18);
       cursor: pointer;
       user-select: none;
+
       background: linear-gradient(
         to bottom,
         #b9b9b9 0%,
@@ -108,10 +114,18 @@
         #7c7c7c 88%,
         #7c7c7c 100%
       );
+
       font-size: 22px;
       font-weight: 800;
       letter-spacing: 0.3px;
     }
+
+    #playBtn:active {
+      transform: translateY(1px);
+      filter: brightness(0.98);
+    }
+
+
 
     #playBtn:active {
       transform: translateY(1px);
