@@ -1,3 +1,4 @@
+console.log("BUILD_MARKER_1");
 const canvas = document.getElementById("c") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
