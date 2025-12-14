@@ -146,11 +146,11 @@ window.addEventListener("pointerdown", (e) => {
 });
 // --- Rendering ---
 function drawOtherHealthBar(x, y, hp) {
-    const w = 78;
-    const h = 7;
+    const w = 100;
+    const h = 10;
     const pct = Math.max(0, Math.min(1, hp / START_HP));
     const bx = x - w / 2;
-    const by = y - hitRadius - 18;
+    const by = y - hitRadius - 20;
     // background
     ctx.fillStyle = "rgba(0,0,0,0.65)";
     ctx.fillRect(bx, by, w, h);
@@ -166,7 +166,7 @@ function drawOtherHealthBar(x, y, hp) {
     ctx.fillRect(bx, by, w * pct, h);
     // HP number INSIDE the bar (centered)
     ctx.fillStyle = "rgba(255,255,255,0.95)";
-    ctx.font = "10px Ubuntu, system-ui";
+    ctx.font = "9px Ubuntu, system-ui";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(Math.round(hp).toLocaleString(), bx + w / 2, by + h / 2);
