@@ -45,7 +45,7 @@
       z-index: 1;
     }
 
-    /* Menu overlay: ONLY the textbox */
+    /* Menu overlay: textbox + Play button */
     #menu {
       position: fixed;
       inset: 0;
@@ -54,6 +54,13 @@
       justify-content: center;
       z-index: 2;
       background: transparent; /* no card, no vignette */
+    }
+
+    #menuInner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
     }
 
     #nameInput {
@@ -77,8 +84,35 @@
       font-weight: 500;
     }
 
-    /* Keep your HUD in DOM so main.ts doesn't crash.
-       You can style it however you like later. */
+    /* Play button (grey with darker bottom) */
+    #playBtn {
+      width: min(520px, calc(100vw - 80px));
+      height: 64px;
+      border-radius: 0;
+      border: 2px solid rgba(0,0,0,0.35);
+      cursor: pointer;
+      user-select: none;
+
+      background: linear-gradient(
+        to bottom,
+        #b9b9b9 0%,
+        #b9b9b9 74%,
+        #7c7c7c 74%,
+        #7c7c7c 100%
+      );
+
+      font-weight: 800;
+      font-size: 24px;
+      color: rgba(0,0,0,0.88);
+      letter-spacing: 0.2px;
+    }
+
+    #playBtn:active {
+      transform: translateY(1px);
+      filter: brightness(0.98);
+    }
+
+    /* HUD */
     #hudBottom {
       position: fixed;
       left: 50%;
@@ -134,7 +168,7 @@
       z-index: 2;
     }
 
-    /* --- SPEED BAR (NEW) --- */
+    /* --- SPEED BAR --- */
     #speedBarWrap { width: 100%; display: flex; justify-content: center; }
 
     #speedBarOuter {
@@ -167,6 +201,73 @@
       user-select: none;
       z-index: 2;
     }
+
+    /* --- DEATH SCREEN OVERLAY --- */
+    #deathScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.35); /* game visible behind */
+      pointer-events: auto;
+    }
+
+    #deathCard {
+      width: min(520px, calc(100vw - 80px));
+      padding: 18px 18px 16px;
+      background: rgba(255,255,255,0.92);
+      border: 2px solid rgba(0,0,0,0.18);
+      border-radius: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #deathSmall {
+      font-size: 18px;
+      font-weight: 700;
+      color: rgba(0,0,0,0.72);
+      text-align: center;
+      line-height: 1.1;
+    }
+
+    #deathBig {
+      font-size: 34px;
+      font-weight: 800;
+      color: rgba(0,0,0,0.9);
+      text-align: center;
+      line-height: 1.05;
+      margin-top: -6px; /* bring closer */
+    }
+
+    #continueBtn {
+      width: 100%;
+      height: 58px;
+      border-radius: 0;
+      border: 2px solid rgba(0,0,0,0.25);
+      cursor: pointer;
+      user-select: none;
+
+      background: linear-gradient(
+        to bottom,
+        #cfcfcf 0%,
+        #cfcfcf 74%,
+        #8c8c8c 74%,
+        #8c8c8c 100%
+      );
+
+      font-weight: 800;
+      font-size: 22px;
+      color: rgba(0,0,0,0.88);
+    }
+
+    #continueBtn:active {
+      transform: translateY(1px);
+      filter: brightness(0.98);
+    }
   </style>
 </head>
 
@@ -177,12 +278,15 @@
   <!-- Game canvas -->
   <canvas id="c"></canvas>
 
-  <!-- Minimal menu -->
+  <!-- Menu -->
   <div id="menu">
-    <input id="nameInput" maxlength="18" placeholder="Good luck, ... (PUT USERNAME HERE)" />
+    <div id="menuInner">
+      <input id="nameInput" maxlength="18" placeholder="Good luck, ... (PUT USERNAME HERE)" />
+      <button id="playBtn">Play!</button>
+    </div>
   </div>
 
-  <!-- HUD (kept for main.ts) -->
+  <!-- HUD -->
   <div id="hudBottom">
     <div id="hudName">Loading...</div>
 
@@ -193,12 +297,20 @@
       </div>
     </div>
 
-    <!-- NEW SPEED BAR -->
     <div id="speedBarWrap">
       <div id="speedBarOuter">
         <div id="speedBarInner"></div>
-        <div id="hudSpeedText">Speed: 0/1000</div>
+        <div id="hudSpeedText">Speed: 0/2000</div>
       </div>
+    </div>
+  </div>
+
+  <!-- Death screen -->
+  <div id="deathScreen">
+    <div id="deathCard">
+      <div id="deathSmall">You were killed by</div>
+      <div id="deathBig">Unknown</div>
+      <button id="continueBtn">Continue</button>
     </div>
   </div>
 

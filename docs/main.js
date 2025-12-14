@@ -4,13 +4,18 @@ const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 const menu = document.getElementById("menu");
 const nameInput = document.getElementById("nameInput");
+const playBtn = document.getElementById("playBtn");
 const hudBottom = document.getElementById("hudBottom");
 const hudName = document.getElementById("hudName");
 const hudHpText = document.getElementById("hudHpText");
 const hpBarInner = document.getElementById("hpBarInner");
-// NEW speed bar DOM refs (classic way like HP)
+// Speed bar (DOM, classic)
 const speedBarInner = document.getElementById("speedBarInner");
 const hudSpeedText = document.getElementById("hudSpeedText");
+// Death screen (DOM)
+const deathScreen = document.getElementById("deathScreen");
+const deathBig = document.getElementById("deathBig");
+const continueBtn = document.getElementById("continueBtn");
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -47,7 +52,7 @@ function wsSend(payload) {
     ws.send(JSON.stringify(out));
 }
 /* =========================
-   SPEED BAR CONFIG (NEW)
+   SPEED BAR CONFIG
    ========================= */
 const SPEED_MAX = 2000; // px/s => full bar => die
 let lastSpeedT = performance.now();
@@ -77,7 +82,7 @@ function updateSpeedFromMouse() {
     const dy = mouseY - lastSpeedY;
     const d = Math.hypot(dx, dy);
     const instant = (d / dt) * 1000; // px/s
-    // smooth up and down nicely
+    // smooth up/down
     const alpha = 0.18;
     smoothSpeed += (instant - smoothSpeed) * alpha;
     lastSpeedT = tNow;
@@ -85,50 +90,63 @@ function updateSpeedFromMouse() {
     lastSpeedY = mouseY;
     const clamped = Math.max(0, Math.min(SPEED_MAX, smoothSpeed));
     const pct = clamped / SPEED_MAX;
-    // bar width
     speedBarInner.style.width = `${pct * 100}%`;
     // Yellow (60) -> Red (0)
     const hue = 60 - pct * 60;
     speedBarInner.style.background = `hsl(${hue}, 95%, 55%)`;
-    // text inside
     hudSpeedText.textContent = `Speed: ${Math.round(clamped)}/${SPEED_MAX}`;
-    // die if too fast (after grace period)
+    // local death (speed)
     if (joined && (tNow - joinTimeMs) > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
-        resetToMenu();
+        showDeathScreen("Speed");
     }
 }
 /* ========================= */
-// -------- Respawn / Reset --------
-function resetToMenu() {
-    // stop heartbeat
+let lastKillerName = null;
+function stopConnection() {
     if (heartbeat !== null) {
         clearInterval(heartbeat);
         heartbeat = null;
     }
-    // close ws
     try {
         ws?.close();
     }
     catch { }
     ws = null;
+}
+function showDeathScreen(killedBy) {
+    // freeze networking + hide HUD, but keep canvas visible behind overlay
+    stopConnection();
+    // Keep world visible for a moment (we do NOT clear canvas here)
+    hudBottom.style.display = "none";
+    menu.style.display = "none";
+    deathBig.textContent = killedBy;
+    deathScreen.style.display = "flex";
+}
+function resetToMenu() {
+    // close ws + timers
+    stopConnection();
     // reset state
     joined = false;
     myId = null;
     myMaxHp = null;
+    lastKillerName = null;
     players.clear();
     smooth.clear();
-    // reset speed tracking + UI
+    // reset speed
     resetSpeedSampler();
-    // UI back to menu
+    // UI
+    deathScreen.style.display = "none";
     hudBottom.style.display = "none";
     menu.style.display = "flex";
-    // reset HUD text
     hudName.textContent = "";
     hudHpText.textContent = "";
     hpBarInner.style.width = "0%";
     nameInput.value = "";
     nameInput.focus();
 }
+continueBtn.addEventListener("click", () => {
+    resetToMenu();
+});
 // --- Join/Menu ---
 nameInput.focus();
 function startGame() {
@@ -139,9 +157,13 @@ function startGame() {
     myName = clean.length ? clean : "Player";
     mouseX = window.innerWidth / 2;
     mouseY = window.innerHeight / 2;
-    // SPEED: initialize sampler + grace timer
+    // initialize speed sampler + grace timer
     joinTimeMs = performance.now();
     resetSpeedSampler();
+    // hide overlays, show HUD
+    deathScreen.style.display = "none";
+    menu.style.display = "none";
+    hudBottom.style.display = "flex";
     // UI feedback immediately
     hudName.textContent = myName || "Loading...";
     hudHpText.textContent = "Connecting...";
@@ -149,10 +171,9 @@ function startGame() {
     hpBarInner.style.backgroundImage = "none";
     hpBarInner.style.background = "hsl(120, 85%, 55%)";
     hpBarInner.style.opacity = "1";
-    menu.style.display = "none";
-    hudBottom.style.display = "flex";
     connect();
 }
+playBtn.addEventListener("click", () => startGame());
 nameInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
         e.preventDefault();
@@ -173,20 +194,21 @@ function connect() {
     ws.addEventListener("message", (ev) => {
         const msg = JSON.parse(ev.data);
         const t = msgType(msg);
-        // Server tells you you're dead -> reset to menu (respawn flow)
+        // server death message (authoritative)
         if (t === "dead") {
-            resetToMenu();
+            // if server includes byName, use it; otherwise fallback to last known killer
+            const byName = typeof msg.byName === "string" ? msg.byName : null;
+            showDeathScreen(byName ?? lastKillerName ?? "Unknown");
             return;
         }
         if (t === "welcome") {
             myId = typeof msg.id === "string" ? msg.id : myId;
             hitRadius = typeof msg.hitRadius === "number" ? msg.hitRadius : hitRadius;
-            // IMPORTANT: max HP is ONLY set from server
+            // max HP from server
             if (typeof msg.maxHp === "number" && msg.maxHp > 0) {
                 myMaxHp = msg.maxHp;
             }
             else if (typeof msg.hp === "number" && msg.hp > 0 && myMaxHp === null) {
-                // fallback only if server didn't send maxHp (older server)
                 myMaxHp = msg.hp;
             }
             wsSend({ t: "setName", name: myName });
@@ -197,10 +219,8 @@ function connect() {
             const list = msg.players;
             if (!Array.isArray(list))
                 return;
-            // update maps
             for (const p of list) {
                 players.set(p.id, p);
-                // init smoothing for others
                 if (p.id !== myId) {
                     const s = smooth.get(p.id);
                     if (!s)
@@ -211,7 +231,6 @@ function connect() {
                     }
                 }
             }
-            // If we have myId, lock myMaxHp from my own state (server authority)
             if (myId) {
                 const meFromList = list.find((p) => p.id === myId);
                 if (meFromList) {
@@ -219,12 +238,10 @@ function connect() {
                         myMaxHp = meFromList.maxHp;
                     }
                     else if (myMaxHp === null && typeof meFromList.hp === "number" && meFromList.hp > 0) {
-                        // fallback for older servers
                         myMaxHp = meFromList.hp;
                     }
                 }
             }
-            // cleanup vanished
             const alive = new Set(list.map((p) => p.id));
             for (const id of smooth.keys())
                 if (!alive.has(id))
@@ -232,11 +249,11 @@ function connect() {
             for (const id of players.keys())
                 if (!alive.has(id))
                     players.delete(id);
-            // Fallback: if your HP hits 0 (or you disappear), reset to menu
+            // If you disappeared or hit 0 without "dead" message, show death screen using best guess
             if (myId) {
                 const me = players.get(myId);
                 if (!me || me.hp <= 0) {
-                    resetToMenu();
+                    showDeathScreen(lastKillerName ?? "Unknown");
                     return;
                 }
             }
@@ -245,10 +262,23 @@ function connect() {
         if (t === "hit") {
             const to = msg.to ?? msg.target ?? msg.id;
             const hp = msg.hp ?? msg.newHp ?? msg.health;
+            // update hp locally for the target
             if (typeof to === "string" && typeof hp === "number") {
                 const target = players.get(to);
                 if (target)
                     target.hp = hp;
+            }
+            // if YOU got hit, remember who did it for the death screen
+            if (myId && to === myId) {
+                const from = msg.from;
+                if (typeof from === "string") {
+                    const killer = players.get(from);
+                    lastKillerName = (killer?.name && killer.name.trim().length) ? killer.name : from.slice(0, 4);
+                }
+                // if it killed you and server doesn�t send "dead", still show it
+                if (typeof hp === "number" && hp <= 0) {
+                    showDeathScreen(lastKillerName ?? "Unknown");
+                }
             }
             return;
         }
@@ -258,14 +288,13 @@ function connect() {
             clearInterval(heartbeat);
             heartbeat = null;
         }
-        // If we were in-game and connection drops (server killed us or restart), go back to menu.
-        if (joined) {
+        // Don�t force menu here � death screen handles it. If it was a random disconnect, send them to menu.
+        if (joined && deathScreen.style.display !== "flex") {
             resetToMenu();
         }
     });
     ws.addEventListener("error", () => {
-        // treat errors like disconnects
-        if (joined)
+        if (joined && deathScreen.style.display !== "flex")
             resetToMenu();
     });
 }
@@ -275,7 +304,7 @@ const MOVE_SEND_MS = 50;
 window.addEventListener("pointermove", (e) => {
     mouseX = e.clientX;
     mouseY = e.clientY;
-    // NEW: update speed meter off the same input stream
+    // speed meter
     updateSpeedFromMouse();
     const now = performance.now();
     if (ws && ws.readyState === WebSocket.OPEN && now - lastMoveSend >= MOVE_SEND_MS) {
@@ -290,7 +319,6 @@ window.addEventListener("pointerdown", (e) => {
 });
 // --- Rendering helpers ---
 function maxHpForPlayer(p) {
-    // for other players, prefer their server-provided maxHp; otherwise fallback to myMaxHp; otherwise 1
     if (typeof p.maxHp === "number" && p.maxHp > 0)
         return p.maxHp;
     if (myMaxHp !== null && myMaxHp > 0)
@@ -305,10 +333,8 @@ function drawOtherHealthBar(x, y, p) {
     const pct = Math.max(0, Math.min(1, p.hp / maxHp));
     const bx = x - w / 2;
     const by = y - hitRadius - 24;
-    // background
     ctx.fillStyle = "rgba(0,0,0,0.65)";
     ctx.fillRect(bx, by, w, h);
-    // color based on HP %
     let color;
     if (pct > 0.6)
         color = "#3ddc84";
@@ -318,11 +344,9 @@ function drawOtherHealthBar(x, y, p) {
         color = "#ff4d4d";
     ctx.fillStyle = color;
     ctx.fillRect(bx, by, w * pct, h);
-    // thick outline (same vibe as player name outline)
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(55,55,55,0.95)";
     ctx.strokeRect(bx, by, w, h);
-    // HP text inside bar
     const text = Math.round(p.hp).toLocaleString();
     ctx.font = "9px Ubuntu, system-ui";
     ctx.textAlign = "center";
@@ -345,7 +369,6 @@ function updateBottomHud() {
     const me = players.get(myId);
     if (!me)
         return;
-    // IMPORTANT: bottom HUD uses myMaxHp (server authority)
     const maxHp = (myMaxHp !== null && myMaxHp > 0) ? myMaxHp : maxHpForPlayer(me);
     hudName.textContent = me.name || myName || "Player";
     hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${Math.round(maxHp).toLocaleString()} HP`;
@@ -358,26 +381,22 @@ function updateBottomHud() {
 }
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // smooth other players
     const SMOOTH = 0.18;
     for (const s of smooth.values()) {
         s.x += (s.tx - s.x) * SMOOTH;
         s.y += (s.ty - s.y) * SMOOTH;
     }
-    // draw everyone except you
     for (const p of players.values()) {
         if (myId && p.id === myId)
             continue;
         const s = smooth.get(p.id);
         const x = s ? s.x : p.x;
         const y = s ? s.y : p.y;
-        // hitbox circle
         ctx.save();
         ctx.beginPath();
         ctx.arc(x, y, hitRadius, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(90,240,150,0.95)";
         ctx.fill();
-        // name label under (outlined)
         const label = (p.name && p.name.trim().length) ? p.name : p.id.slice(0, 4);
         ctx.font = "12px Ubuntu, system-ui";
         ctx.textAlign = "center";
@@ -388,7 +407,6 @@ function loop() {
         ctx.fillStyle = "rgba(255,255,255,0.92)";
         ctx.fillText(label, x, y + hitRadius + 14);
         ctx.restore();
-        // other player's health bar
         drawOtherHealthBar(x, y, p);
     }
     updateBottomHud();
