@@ -146,11 +146,11 @@ window.addEventListener("pointerdown", (e) => {
 });
 // --- Rendering ---
 function drawOtherHealthBar(x, y, hp) {
-    const w = 100;
-    const h = 10;
+    const w = 70;
+    const h = 15;
     const pct = Math.max(0, Math.min(1, hp / START_HP));
     const bx = x - w / 2;
-    const by = y - hitRadius - 20;
+    const by = y - hitRadius - 24;
     // background
     ctx.fillStyle = "rgba(0,0,0,0.65)";
     ctx.fillRect(bx, by, w, h);
@@ -165,11 +165,21 @@ function drawOtherHealthBar(x, y, hp) {
     ctx.fillStyle = color;
     ctx.fillRect(bx, by, w * pct, h);
     // HP number INSIDE the bar (centered)
-    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    const text = Math.round(hp).toLocaleString();
     ctx.font = "9px Ubuntu, system-ui";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(Math.round(hp).toLocaleString(), bx + w / 2, by + h / 2);
+    // black outline
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(0,0,0,0.9)";
+    ctx.strokeText(text, bx + w / 2, by + h / 2);
+    // white fill on top
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.fillText(text, bx + w / 2, by + h / 2);
+    // reset state (important)
+    ctx.lineWidth = 1;
+    ctx.textAlign = "start";
+    ctx.textBaseline = "alphabetic";
     // reset alignment (important so other text isn't broken)
     ctx.textAlign = "start";
     ctx.textBaseline = "alphabetic";

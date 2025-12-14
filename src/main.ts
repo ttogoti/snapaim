@@ -202,16 +202,34 @@ window.addEventListener("pointerdown", (e) => {
   ctx.fillRect(bx, by, w * pct, h);
 
     // HP number INSIDE the bar (centered)
-  ctx.fillStyle = "rgba(255,255,255,0.95)";
-  ctx.font = "11px Ubuntu, system-ui";
+  const text = Math.round(hp).toLocaleString();
+
+  ctx.font = "9px Ubuntu, system-ui";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  ctx.fillText(
-    Math.round(hp).toLocaleString(),
+    // black outline
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(0,0,0,0.9)";
+  ctx.strokeText(
+    text,
     bx + w / 2,
     by + h / 2
   );
+
+// white fill on top
+  ctx.fillStyle = "rgba(255,255,255,0.95)";
+  ctx.fillText(
+    text,
+    bx + w / 2,
+    by + h / 2
+  );
+
+// reset state (important)
+  ctx.lineWidth = 1;
+  ctx.textAlign = "start";
+  ctx.textBaseline = "alphabetic";
+
 
   // reset alignment (important so other text isn't broken)
   ctx.textAlign = "start";
