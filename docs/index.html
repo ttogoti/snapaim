@@ -25,7 +25,7 @@
       background: #ffffff;
     }
 
-    /* Background grid canvas */
+    /* Background grid canvas (behind everything) */
     #bg {
       position: fixed;
       inset: 0;
@@ -35,7 +35,7 @@
       z-index: 0;
     }
 
-    /* Game canvas */
+    /* Game canvas (your main.ts uses this) */
     #c {
       position: fixed;
       inset: 0;
@@ -45,7 +45,7 @@
       z-index: 1;
     }
 
-    /* Menu (username only) */
+    /* Menu overlay: ONLY the textbox */
     #menu {
       position: fixed;
       inset: 0;
@@ -53,20 +53,23 @@
       align-items: center;
       justify-content: center;
       z-index: 2;
-      background: transparent;
+      background: transparent; /* no card, no vignette */
     }
 
     #nameInput {
       width: min(520px, calc(100vw - 80px));
       height: 62px;
+
       background: #ffffff;
       color: #000000;
-      border: 2px solid #b0b0b0;
-      border-radius: 0;
+
+      border: 2px solid #b0b0b0; /* grey outline */
+      border-radius: 0;          /* rectangle */
       outline: none;
+
       font-size: 22px;
       font-weight: 600;
-      text-align: center;
+      text-align: center;        /* center placeholder + input text */
     }
 
     #nameInput::placeholder {
@@ -74,7 +77,8 @@
       font-weight: 500;
     }
 
-    /* Bottom HUD */
+    /* Keep your HUD in DOM so main.ts doesn't crash.
+       You can style it however you like later. */
     #hudBottom {
       position: fixed;
       left: 50%;
@@ -97,11 +101,7 @@
       color: rgba(0,0,0,0.85);
     }
 
-    #hpBarWrap {
-      width: 100%;
-      display: flex;
-      justify-content: center;
-    }
+    #hpBarWrap { width: 100%; display: flex; justify-content: center; }
 
     #hpBarOuter {
       position: relative;
@@ -137,18 +137,18 @@
 </head>
 
 <body>
-  <!-- Background -->
+  <!-- Background grid -->
   <canvas id="bg"></canvas>
 
-  <!-- Game -->
+  <!-- Game canvas -->
   <canvas id="c"></canvas>
 
-  <!-- Username input -->
+  <!-- Minimal menu -->
   <div id="menu">
     <input id="nameInput" maxlength="18" placeholder="Good luck, ..." />
   </div>
 
-  <!-- HUD -->
+  <!-- HUD (kept for main.ts) -->
   <div id="hudBottom">
     <div id="hudName">Loading...</div>
 
@@ -160,7 +160,7 @@
     </div>
   </div>
 
-  <!-- Grid animation -->
+  <!-- Moving grid renderer (does NOT touch game canvas) -->
   <script>
     const bg = document.getElementById("bg");
     const bctx = bg.getContext("2d");
@@ -174,15 +174,18 @@
 
     let ox = 0;
     let oy = 0;
-    const spacing = 40;
-    const speed = 0.22;
+
+    const spacing = 40;     // grid size
+    const speed = 0.22;     // drift speed (top-left)
 
     function drawGrid() {
       bctx.clearRect(0, 0, bg.width, bg.height);
 
+      // white background
       bctx.fillStyle = "#ffffff";
       bctx.fillRect(0, 0, bg.width, bg.height);
 
+      // grid lines
       bctx.strokeStyle = "#e2e2e2";
       bctx.lineWidth = 1;
 
@@ -212,6 +215,7 @@
     drawGrid();
   </script>
 
+  <!-- Your compiled TS -->
   <script src="./main.js" defer></script>
 </body>
 </html>
