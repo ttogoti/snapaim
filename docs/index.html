@@ -8,7 +8,7 @@
   <!-- Ubuntu font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700;800&display=swap" rel="stylesheet">
 
   <style>
     * {
@@ -48,6 +48,14 @@
     /* =========
        MENU UI
        ========= */
+    :root {
+      /* Diep-sized width for username + play */
+      --menuW: min(640px, calc(100vw - 120px));
+      --uiRadius: 6px; /* tiny curve */
+      --outline: rgba(0,0,0,0.92);
+      --outlineSize: 1.5px; /* text outline thickness */
+    }
+
     #menu {
       position: fixed;
       inset: 0;
@@ -62,20 +70,12 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
-    }
-
-    /* Shared menu width so input + play align */
-    :root {
-      --menuW: min(420px, calc(100vw - 80px));
-      --uiRadius: 6px; /* tiny curve like reference */
-      --outline: rgba(0,0,0,0.92);
-      --outlineSize: 1.4px; /* text outline thickness */
+      gap: 14px;
     }
 
     #nameInput {
       width: var(--menuW);
-      height: 62px;
+      height: 66px;
 
       background: #ffffff;
       color: #000000;
@@ -98,40 +98,37 @@
     .btnOutlinedText {
       color: rgba(255,255,255,0.98);
       text-shadow:
-        calc(var(--outlineSize) * 1)  0 var(--outline),
+        var(--outlineSize) 0 var(--outline),
         calc(var(--outlineSize) * -1) 0 var(--outline),
-        0 calc(var(--outlineSize) * 1)  var(--outline),
+        0 var(--outlineSize) var(--outline),
         0 calc(var(--outlineSize) * -1) var(--outline),
-        calc(var(--outlineSize) * 0.85) calc(var(--outlineSize) * 0.85) var(--outline),
-        calc(var(--outlineSize) * -0.85) calc(var(--outlineSize) * 0.85) var(--outline),
-        calc(var(--outlineSize) * 0.85) calc(var(--outlineSize) * -0.85) var(--outline),
-        calc(var(--outlineSize) * -0.85) calc(var(--outlineSize) * -0.85) var(--outline);
+        calc(var(--outlineSize) * 0.9) calc(var(--outlineSize) * 0.9) var(--outline),
+        calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * 0.9) var(--outline),
+        calc(var(--outlineSize) * 0.9) calc(var(--outlineSize) * -0.9) var(--outline),
+        calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * -0.9) var(--outline);
     }
 
-    /* Play button (grey with darker bottom + tiny curve + subtle border) */
+    /* Play button (keep your existing style, just make it big like Diep) */
     #playBtn {
       width: var(--menuW);
-      height: 48px;
+      height: 52px;
 
       border-radius: var(--uiRadius);
-      border: 0.5px solid rgba(0, 0, 0, 0.18); /* barely noticeable */
+      border: 0.6px solid rgba(0, 0, 0, 0.18);
       cursor: pointer;
       user-select: none;
 
       background: linear-gradient(
         to bottom,
-        #b9b9b9 0%,
-        #b9b9b9 88%,
-        #7c7c7c 88%,
-        #7c7c7c 100%
+        #1bb1d6 0%,
+        #1bb1d6 86%,
+        #1590b0 86%,
+        #1590b0 100%
       );
 
       font-weight: 800;
-      font-size: 18px;
-      letter-spacing: 0.2px;
-
-      /* make the text outlined like reference */
-      /* (we apply the class in HTML below) */
+      font-size: 20px;
+      letter-spacing: 0.3px;
     }
 
     #playBtn:active {
@@ -140,7 +137,7 @@
     }
 
     /* =========
-       HUD (IN-GAME) — stays SQUARE (no curves)
+       HUD (IN-GAME) — keep square, untouched
        ========= */
     #hudBottom {
       position: fixed;
@@ -170,7 +167,7 @@
       position: relative;
       width: 100%;
       height: 18px;
-      border-radius: 0;     /* keep square */
+      border-radius: 0;
       overflow: hidden;
       background: rgba(0,0,0,0.08);
       border: 1px solid rgba(0,0,0,0.12);
@@ -197,13 +194,14 @@
       z-index: 2;
     }
 
+    /* --- SPEED BAR --- */
     #speedBarWrap { width: 100%; display: flex; justify-content: center; }
 
     #speedBarOuter {
       position: relative;
       width: 100%;
       height: 18px;
-      border-radius: 0;     /* keep square */
+      border-radius: 0;
       overflow: hidden;
       background: rgba(0,0,0,0.08);
       border: 1px solid rgba(0,0,0,0.12);
@@ -231,7 +229,7 @@
     }
 
     /* =========
-       DEATH OVERLAY (UI) — tiny curves + outlined text
+       DEATH SCREEN OVERLAY — keep as you had it
        ========= */
     #deathScreen {
       position: fixed;
@@ -273,12 +271,11 @@
       margin-top: -6px;
     }
 
-    /* Continue button */
     #continueBtn {
       width: 160px;
       height: 40px;
       border-radius: var(--uiRadius);
-      border: 0.5px solid rgba(0, 0, 0, 0.18);
+      border: 0.6px solid rgba(0,0,0,0.18);
       cursor: pointer;
       user-select: none;
 
@@ -317,7 +314,7 @@
     </div>
   </div>
 
-  <!-- HUD -->
+  <!-- HUD (kept for main.ts) -->
   <div id="hudBottom">
     <div id="hudName">Loading...</div>
 
