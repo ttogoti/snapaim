@@ -154,14 +154,25 @@ function drawOtherHealthBar(x, y, hp) {
     // background
     ctx.fillStyle = "rgba(0,0,0,0.65)";
     ctx.fillRect(bx, by, w, h);
-    // smooth color fade: red (0) -> green (120)
-    const hue = pct * 120;
-    ctx.fillStyle = `hsl(${hue}, 85%, 55%)`;
+    // color based on HP %
+    let color;
+    if (pct > 0.6)
+        color = "#3ddc84";
+    else if (pct > 0.3)
+        color = "#f5c542";
+    else
+        color = "#ff4d4d";
+    ctx.fillStyle = color;
     ctx.fillRect(bx, by, w * pct, h);
-    // HP number above bar
-    ctx.fillStyle = "rgba(255,255,255,0.9)";
-    ctx.font = "11px system-ui";
-    ctx.fillText(`${Math.round(hp).toLocaleString()}`, bx, by - 4);
+    // HP number INSIDE the bar (centered)
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.font = "10px Ubuntu, system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(Math.round(hp).toLocaleString(), bx + w / 2, by + h / 2);
+    // reset alignment (important so other text isn't broken)
+    ctx.textAlign = "start";
+    ctx.textBaseline = "alphabetic";
 }
 function updateBottomHud() {
     if (!myId)

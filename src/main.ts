@@ -180,7 +180,28 @@ window.addEventListener("pointerdown", (e) => {
 });
 
 // --- Rendering ---
-  // HP number INSIDE the bar (centered)
+  function drawOtherHealthBar(x: number, y: number, hp: number) {
+  const w = 78;
+  const h = 7;
+  const pct = Math.max(0, Math.min(1, hp / START_HP));
+
+  const bx = x - w / 2;
+  const by = y - hitRadius - 18;
+
+  // background
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.fillRect(bx, by, w, h);
+
+  // color based on HP %
+  let color: string;
+  if (pct > 0.6) color = "#3ddc84";
+  else if (pct > 0.3) color = "#f5c542";
+  else color = "#ff4d4d";
+
+  ctx.fillStyle = color;
+  ctx.fillRect(bx, by, w * pct, h);
+
+    // HP number INSIDE the bar (centered)
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.font = "10px Ubuntu, system-ui";
   ctx.textAlign = "center";
@@ -195,6 +216,8 @@ window.addEventListener("pointerdown", (e) => {
   // reset alignment (important so other text isn't broken)
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
+}
+
 
 
 
