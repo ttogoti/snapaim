@@ -1,128 +1,193 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SnapAim</title>
-    <style>
-      :root { color-scheme: dark; }
-      html, body { margin: 0; height: 100%; overflow: hidden; background: #111318; }
-      canvas { display: block; }
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SnapAim</title>
 
-      /* Simple menu (diep-ish) */
-      #menu {
-        position: fixed; inset: 0;
-        display: grid; place-items: center;
-        background: radial-gradient(900px 600px at 50% 40%, rgba(70,90,140,.18), rgba(0,0,0,.75));
-        z-index: 10;
-      }
-      #menuBox {
-        width: min(420px, 92vw);
-        padding: 14px 14px 12px;
-        border-radius: 10px;
-        background: rgba(0,0,0,.55);
-        border: 1px solid rgba(255,255,255,.08);
-        font: 13px system-ui, -apple-system, Segoe UI, Roboto, Arial;
-        color: rgba(255,255,255,.92);
-      }
-      #titleRow{
-        display:flex;
-        align-items:baseline;
-        justify-content:space-between;
-        margin-bottom:10px;
-      }
-      #titleRow b{ font-size: 14px; letter-spacing: .5px; }
-      #titleRow span{ opacity:.7; font-size: 12px; }
+  <!-- Ubuntu font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
 
-      #nameInput{
-        width: 100%;
-        box-sizing: border-box;
-        padding: 10px 10px;
-        border-radius: 6px;
-        border: 1px solid rgba(255,255,255,.10);
-        background: rgba(18,20,26,.85);
-        color: rgba(255,255,255,.92);
-        outline: none;
-      }
-      #menuHelp{
-        margin-top: 8px;
-        opacity: .70;
-        font-size: 12px;
-        line-height: 1.3;
-      }
+  <style>
+    :root{
+      font-family: "Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
 
-      /* Bottom HUD (your HP only) */
-      #hudBottom {
-        position: fixed;
-        left: 0; right: 0; bottom: 0;
-        padding: 10px 12px 12px;
-        display: none;
-        z-index: 5;
-        pointer-events: none;
-        font: 13px system-ui, -apple-system, Segoe UI, Roboto, Arial;
-        color: rgba(255,255,255,.92);
-      }
-      #hudInner{
-        width: min(860px, 96vw);
-        margin: 0 auto;
-        padding: 10px 12px;
-        border-radius: 10px;
-        background: rgba(0,0,0,.50);
-        border: 1px solid rgba(255,255,255,.08);
-      }
-      #hudRow{
-        display:flex;
-        align-items:baseline;
-        justify-content:space-between;
-      }
-      #hudName{ font-weight: 700; }
-      #hudHpText{ opacity:.85; font-variant-numeric: tabular-nums; }
+    html, body {
+      height: 100%;
+    }
 
-      #hpBarOuter{
-        margin-top: 8px;
-        height: 14px;
-        border-radius: 999px;
-        background: rgba(255,255,255,.08);
-        overflow: hidden;
-        border: 1px solid rgba(255,255,255,.10);
-      }
-      #hpBarInner{
-        height: 100%;
-        width: 100%;
-        background: #3ddc84;
-        opacity: 1;
-      }
+    body{
+      margin:0;
+      overflow:hidden;
+      background:#0b0f14;
+      font-family: "Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
 
+    /* Canvas full screen */
+    #c{
+      position:fixed;
+      inset:0;
+      width:100vw;
+      height:100vh;
+      display:block;
+    }
 
-    </style>
-  </head>
+    /* Menu overlay */
+    #menu{
+      position:fixed;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: radial-gradient(1200px 700px at 50% 40%, rgba(40,60,90,0.35), rgba(10,14,20,0.92));
+      z-index:10;
+    }
 
-  <body>
-    <div id="menu">
-      <div id="menuBox">
-        <div id="titleRow">
-          <b>SNAPAIM</b>
-          <span>press Enter</span>
-        </div>
-        <input id="nameInput" maxlength="18" placeholder="username" autocomplete="off" />
-        <div id="menuHelp">
-          Move to aim. Click to hit. Damage = speed.<br>
-          (Free server may sleep; first load can be slow.)
-        </div>
+    .menuCard{
+      width:min(520px, calc(100vw - 48px));
+      border-radius:16px;
+      padding:22px 20px 18px;
+      background: rgba(10,12,16,0.68);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 16px 60px rgba(0,0,0,0.55);
+      backdrop-filter: blur(10px);
+    }
+
+    .title{
+      font-weight:700;
+      font-size:20px;
+      color:rgba(255,255,255,0.92);
+      margin-bottom:6px;
+      letter-spacing:0.2px;
+    }
+
+    .subtitle{
+      font-weight:400;
+      font-size:13px;
+      line-height:1.35;
+      color:rgba(255,255,255,0.70);
+      margin-bottom:12px;
+    }
+
+    #nameInput{
+      width:100%;
+      height:40px;
+      border-radius:10px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(0,0,0,0.35);
+      color: rgba(255,255,255,0.92);
+      padding: 0 12px;
+      outline:none;
+      font-family: "Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-size:14px;
+    }
+
+    #nameInput:focus{
+      border-color: rgba(120,170,255,0.55);
+      box-shadow: 0 0 0 3px rgba(120,170,255,0.18);
+    }
+
+    .hint{
+      margin-top:10px;
+      font-size:12px;
+      color:rgba(255,255,255,0.55);
+    }
+
+    /* Bottom HUD: no background container, centered */
+    #hudBottom{
+      position:fixed;
+      left:50%;
+      bottom:28px;
+      transform:translateX(-50%);
+      width:min(860px, calc(100vw - 48px));
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      gap:10px;
+      pointer-events:none;
+      z-index:5;
+    }
+
+    /* Username centered above bar */
+    #hudName{
+      width:100%;
+      text-align:center;
+      font-weight:700;
+      font-size:18px;
+      letter-spacing:0.2px;
+      color:rgba(255,255,255,0.92);
+      text-shadow:0 1px 10px rgba(0,0,0,0.60);
+    }
+
+    /* Bar container */
+    #hpBarWrap{
+      width:100%;
+      display:flex;
+      justify-content:center;
+    }
+
+    #hpBarOuter{
+      position:relative;
+      width:100%;
+      height:18px;
+      border-radius:10px;
+      overflow:hidden;
+      background:rgba(255,255,255,0.08);
+      box-shadow:0 6px 18px rgba(0,0,0,0.35);
+    }
+
+    /* Filled portion (JS controls width + color) */
+    #hpBarInner{
+      height:100%;
+      width:100%;
+      background:#3ddc84;
+      background-image:none;
+      opacity:1;
+    }
+
+    /* HP text centered ON TOP of bar */
+    #hudHpText{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:500;
+      font-size:13px;
+      color:rgba(255,255,255,0.92);
+      text-shadow:0 1px 10px rgba(0,0,0,0.65);
+      z-index:2;
+      user-select:none;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+
+  <div id="menu">
+    <div class="menuCard">
+      <div class="title">SnapAim</div>
+      <div class="subtitle">Enter a username, press Enter, then move &amp; click to fight.</div>
+      <input id="nameInput" maxlength="18" placeholder="username" />
+      <div class="hint">Tip: on free Render, the server may “wake up” the first time.</div>
+    </div>
+  </div>
+
+  <div id="hudBottom" style="display:none;">
+    <div id="hudName">player</div>
+
+    <div id="hpBarWrap">
+      <div id="hpBarOuter">
+        <div id="hpBarInner"></div>
+        <div id="hudHpText">100,000 / 100,000 HP</div>
       </div>
     </div>
+  </div>
 
-    <div id="hudBottom">
-      <div id="hudInner">
-        <div id="hudRow">
-          <div id="hudName">—</div>
-          <div id="hudHpText">—</div>
-        </div>
-        <div id="hpBarOuter"><div id="hpBarInner"></div></div>
-      </div>
-    </div>
-
-    <canvas id="c"></canvas>
-    <script src="./main.js"></script>
-  </body>
+  <script src="./main.js" defer></script>
+</body>
 </html>
