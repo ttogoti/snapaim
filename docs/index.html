@@ -45,7 +45,9 @@
       z-index: 1;
     }
 
-    /* Menu overlay: textbox + Play button */
+    /* =========
+       MENU UI
+       ========= */
     #menu {
       position: fixed;
       inset: 0;
@@ -53,30 +55,38 @@
       align-items: center;
       justify-content: center;
       z-index: 2;
-      background: transparent; /* no card, no vignette */
+      background: transparent;
     }
 
     #menuInner {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 14px;
+      gap: 10px;
+    }
+
+    /* Shared menu width so input + play align */
+    :root {
+      --menuW: min(420px, calc(100vw - 80px));
+      --uiRadius: 6px; /* tiny curve like reference */
+      --outline: rgba(0,0,0,0.92);
+      --outlineSize: 1.4px; /* text outline thickness */
     }
 
     #nameInput {
-      width: min(520px, calc(100vw - 80px));
+      width: var(--menuW);
       height: 62px;
 
       background: #ffffff;
       color: #000000;
 
-      border: 2px solid #b0b0b0; /* grey outline */
-      border-radius: 0;          /* rectangle */
+      border: 2px solid #b0b0b0;
+      border-radius: var(--uiRadius);
       outline: none;
 
       font-size: 22px;
       font-weight: 600;
-      text-align: center;        /* center placeholder + input text */
+      text-align: center;
     }
 
     #nameInput::placeholder {
@@ -84,12 +94,27 @@
       font-weight: 500;
     }
 
-    /* Play button (grey with darker bottom) */
+    /* Text outline (diep-style) for buttons */
+    .btnOutlinedText {
+      color: rgba(255,255,255,0.98);
+      text-shadow:
+        calc(var(--outlineSize) * 1)  0 var(--outline),
+        calc(var(--outlineSize) * -1) 0 var(--outline),
+        0 calc(var(--outlineSize) * 1)  var(--outline),
+        0 calc(var(--outlineSize) * -1) var(--outline),
+        calc(var(--outlineSize) * 0.85) calc(var(--outlineSize) * 0.85) var(--outline),
+        calc(var(--outlineSize) * -0.85) calc(var(--outlineSize) * 0.85) var(--outline),
+        calc(var(--outlineSize) * 0.85) calc(var(--outlineSize) * -0.85) var(--outline),
+        calc(var(--outlineSize) * -0.85) calc(var(--outlineSize) * -0.85) var(--outline);
+    }
+
+    /* Play button (grey with darker bottom + tiny curve + subtle border) */
     #playBtn {
-      width: min(200px, calc(100vw - 80px));
+      width: var(--menuW);
       height: 48px;
-      border-radius: 0;
-      border: 0.66px solid rgba(0,0,0,0.35);
+
+      border-radius: var(--uiRadius);
+      border: 0.5px solid rgba(0, 0, 0, 0.18); /* barely noticeable */
       cursor: pointer;
       user-select: none;
 
@@ -102,9 +127,11 @@
       );
 
       font-weight: 800;
-      font-size: 12px;
-      color: rgba(0,0,0,0.88);
+      font-size: 18px;
       letter-spacing: 0.2px;
+
+      /* make the text outlined like reference */
+      /* (we apply the class in HTML below) */
     }
 
     #playBtn:active {
@@ -112,7 +139,9 @@
       filter: brightness(0.98);
     }
 
-    /* HUD */
+    /* =========
+       HUD (IN-GAME) — stays SQUARE (no curves)
+       ========= */
     #hudBottom {
       position: fixed;
       left: 50%;
@@ -141,7 +170,7 @@
       position: relative;
       width: 100%;
       height: 18px;
-      border-radius: 0;
+      border-radius: 0;     /* keep square */
       overflow: hidden;
       background: rgba(0,0,0,0.08);
       border: 1px solid rgba(0,0,0,0.12);
@@ -168,14 +197,13 @@
       z-index: 2;
     }
 
-    /* --- SPEED BAR --- */
     #speedBarWrap { width: 100%; display: flex; justify-content: center; }
 
     #speedBarOuter {
       position: relative;
       width: 100%;
       height: 18px;
-      border-radius: 0;
+      border-radius: 0;     /* keep square */
       overflow: hidden;
       background: rgba(0,0,0,0.08);
       border: 1px solid rgba(0,0,0,0.12);
@@ -184,7 +212,7 @@
     #speedBarInner {
       height: 100%;
       width: 0%;
-      background: hsl(60, 95%, 55%); /* yellow default */
+      background: hsl(60, 95%, 55%);
       background-image: none;
       opacity: 1;
     }
@@ -202,7 +230,9 @@
       z-index: 2;
     }
 
-    /* --- DEATH SCREEN OVERLAY --- */
+    /* =========
+       DEATH OVERLAY (UI) — tiny curves + outlined text
+       ========= */
     #deathScreen {
       position: fixed;
       inset: 0;
@@ -210,7 +240,7 @@
       display: none;
       align-items: center;
       justify-content: center;
-      background: rgba(0,0,0,0.35); /* game visible behind */
+      background: rgba(0,0,0,0.35);
       pointer-events: auto;
     }
 
@@ -218,12 +248,12 @@
       width: min(520px, calc(100vw - 80px));
       padding: 18px 18px 16px;
       background: rgba(255,255,255,0.92);
-      border: 2px solid rgba(0,0,0,0.18);
-      border-radius: 0;
+      border: 1px solid rgba(0,0,0,0.18);
+      border-radius: var(--uiRadius);
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
     #deathSmall {
@@ -240,14 +270,15 @@
       color: rgba(0,0,0,0.9);
       text-align: center;
       line-height: 1.05;
-      margin-top: -6px; /* bring closer */
+      margin-top: -6px;
     }
 
+    /* Continue button */
     #continueBtn {
-      width: 30%;
-      height: 45px;
-      border-radius: 0;
-      border: 0.66px solid rgba(0,0,0,0.25);
+      width: 160px;
+      height: 40px;
+      border-radius: var(--uiRadius);
+      border: 0.5px solid rgba(0, 0, 0, 0.18);
       cursor: pointer;
       user-select: none;
 
@@ -260,8 +291,8 @@
       );
 
       font-weight: 800;
-      font-size: 11px;
-      color: rgba(0,0,0,0.88);
+      font-size: 16px;
+      letter-spacing: 0.2px;
     }
 
     #continueBtn:active {
@@ -282,7 +313,7 @@
   <div id="menu">
     <div id="menuInner">
       <input id="nameInput" maxlength="18" placeholder="Good luck, ... (PUT USERNAME HERE)" />
-      <button id="playBtn">Play!</button>
+      <button id="playBtn" class="btnOutlinedText">Play!</button>
     </div>
   </div>
 
@@ -310,7 +341,7 @@
     <div id="deathCard">
       <div id="deathSmall">You were killed by</div>
       <div id="deathBig">Unknown</div>
-      <button id="continueBtn">Continue</button>
+      <button id="continueBtn" class="btnOutlinedText">Continue</button>
     </div>
   </div>
 
@@ -329,17 +360,15 @@
     let ox = 0;
     let oy = 0;
 
-    const spacing = 40;     // grid size
-    const speed = 0.22;     // drift speed (top-left)
+    const spacing = 40;
+    const speed = 0.22;
 
     function drawGrid() {
       bctx.clearRect(0, 0, bg.width, bg.height);
 
-      // white background
       bctx.fillStyle = "#ffffff";
       bctx.fillRect(0, 0, bg.width, bg.height);
 
-      // grid lines
       bctx.strokeStyle = "#e2e2e2";
       bctx.lineWidth = 1;
 
