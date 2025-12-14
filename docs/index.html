@@ -93,14 +93,13 @@
         calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * -0.9) var(--outline);
     }
 
-      /* Play button — custom red-box size */
-      /* Play button — custom red-box size */
+    /* Play button — custom red-box size */
     #playBtn {
-      width: 320px;          /* THIS is the red-box width */
+      width: 320px;          /* red-box width */
       height: 48px;
 
-      margin-top: 22px;     /* pushes it further down ON PURPOSE */
-      align-self: center;   /* keeps it centered under the input */
+      margin-top: 22px;     /* pushes it down on purpose */
+      align-self: center;
 
       border-radius: var(--uiRadius);
       border: 0.5px solid rgba(0,0,0,0.18);
@@ -125,9 +124,33 @@
       filter: brightness(0.98);
     }
 
+    /* Tutorial button — same gap as name->play, same width as play, green */
+    #tutorialBtn {
+      width: 320px;          /* same as Play */
+      height: 30px;          /* 48 - (66-48) = 30 */
 
+      margin-top: 22px;      /* same gap as name->play */
+      align-self: center;
 
-    #playBtn:active {
+      border-radius: var(--uiRadius);
+      border: 0.5px solid rgba(0,0,0,0.18);
+      cursor: pointer;
+      user-select: none;
+
+      background: linear-gradient(
+        to bottom,
+        #7fe27f 0%,
+        #7fe27f 88%,
+        #4fbf4f 88%,
+        #4fbf4f 100%
+      );
+
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.25px;
+    }
+
+    #tutorialBtn:active {
       transform: translateY(1px);
       filter: brightness(0.98);
     }
@@ -254,6 +277,7 @@
     <div id="menuInner">
       <input id="nameInput" maxlength="18" placeholder="Good luck, ... (PUT USERNAME HERE)" />
       <button id="playBtn" class="btnOutlinedText">Play!</button>
+      <button id="tutorialBtn" class="btnOutlinedText">Tutorial</button>
     </div>
   </div>
 
