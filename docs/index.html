@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -93,19 +93,16 @@
         calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * -0.9) var(--outline);
     }
 
-    /* Play button � custom red-box size */
+    /* Play button — custom red-box size */
     #playBtn {
-      width: 320px;          /* red-box width */
+      width: 320px;
       height: 48px;
-
-      margin-top: 22px;     /* pushes it down on purpose */
+      margin-top: 22px;
       align-self: center;
-
       border-radius: var(--uiRadius);
       border: 0.5px solid rgba(0,0,0,0.18);
       cursor: pointer;
       user-select: none;
-
       background: linear-gradient(
         to bottom,
         #b9b9b9 0%,
@@ -113,7 +110,6 @@
         #7c7c7c 88%,
         #7c7c7c 100%
       );
-
       font-size: 22px;
       font-weight: 800;
       letter-spacing: 0.3px;
@@ -124,19 +120,16 @@
       filter: brightness(0.98);
     }
 
-    /* Tutorial button � same gap as name->play, same width as play, green */
+    /* Tutorial button — same gap as name->play, same width as play, green */
     #tutorialBtn {
-      width: 320px;          /* same as Play */
-      height: 30px;          /* 48 - (66-48) = 30 */
-
-      margin-top: 22px;      /* same gap as name->play */
+      width: 320px;
+      height: 30px;
+      margin-top: 22px;
       align-self: center;
-
       border-radius: var(--uiRadius);
       border: 0.5px solid rgba(0,0,0,0.18);
       cursor: pointer;
       user-select: none;
-
       background: linear-gradient(
         to bottom,
         #7fe27f 0%,
@@ -144,7 +137,6 @@
         #4fbf4f 88%,
         #4fbf4f 100%
       );
-
       font-size: 16px;
       font-weight: 800;
       letter-spacing: 0.25px;
@@ -265,6 +257,79 @@
       font-weight: 800;
       cursor: pointer;
     }
+
+    /* ========= TUTORIAL OVERLAY ========= */
+    #tutorialScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 5; /* above menu + HUD + death */
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.35);
+    }
+
+    #tutorialPanel {
+      width: calc(100vw - 80px);
+      height: calc(100vh - 80px);
+      max-width: 1200px;
+      max-height: 800px;
+      background: rgba(255,255,255,0.96);
+      border: 1px solid rgba(0,0,0,0.18);
+      border-radius: var(--uiRadius);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #tutorialHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(0,0,0,0.12);
+      background: rgba(0,0,0,0.03);
+    }
+
+    #tutorialTitle {
+      font-size: 20px;
+      font-weight: 800;
+      color: rgba(0,0,0,0.88);
+    }
+
+    #tutorialClose {
+      width: 44px;
+      height: 38px;
+      border-radius: var(--uiRadius);
+      border: 0.5px solid rgba(0,0,0,0.18);
+      cursor: pointer;
+      user-select: none;
+      background: linear-gradient(
+        to bottom,
+        #cfcfcf 0%,
+        #cfcfcf 88%,
+        #8c8c8c 88%,
+        #8c8c8c 100%
+      );
+      font-size: 18px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #tutorialBody {
+      padding: 18px;
+      overflow: auto;
+    }
+
+    #tutorialText {
+      font-size: 20px;
+      font-weight: 600;
+      color: rgba(0,0,0,0.88);
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 
@@ -278,6 +343,19 @@
       <input id="nameInput" maxlength="18" placeholder="Good luck, ... (PUT USERNAME HERE)" />
       <button id="playBtn" class="btnOutlinedText">Play!</button>
       <button id="tutorialBtn" class="btnOutlinedText">Tutorial</button>
+    </div>
+  </div>
+
+  <!-- TUTORIAL OVERLAY -->
+  <div id="tutorialScreen">
+    <div id="tutorialPanel">
+      <div id="tutorialHeader">
+        <div id="tutorialTitle">Tutorial</div>
+        <button id="tutorialClose">✕</button>
+      </div>
+      <div id="tutorialBody">
+        <div id="tutorialText">The faster you go, the more damage you can do. Click to apply damage at your speed, if you are moving at 1000, and you click on someone while moving at 1000, you deal 1000 damage. Do not go over the speed limit, or you die to speed. Your mouse is your character.</div>
+      </div>
     </div>
   </div>
 
@@ -303,8 +381,37 @@
     </div>
   </div>
 
-  <!-- Background grid -->
+  <!-- Background grid + Tutorial wiring -->
   <script>
+    // ---------- Tutorial overlay wiring ----------
+    const tutorialBtn = document.getElementById("tutorialBtn");
+    const tutorialScreen = document.getElementById("tutorialScreen");
+    const tutorialClose = document.getElementById("tutorialClose");
+    const tutorialPanel = document.getElementById("tutorialPanel");
+
+    function openTutorial() {
+      tutorialScreen.style.display = "flex";
+    }
+    function closeTutorial() {
+      tutorialScreen.style.display = "none";
+    }
+
+    tutorialBtn.addEventListener("click", openTutorial);
+    tutorialClose.addEventListener("click", closeTutorial);
+
+    // click outside the panel closes it
+    tutorialScreen.addEventListener("click", (e) => {
+      if (e.target === tutorialScreen) closeTutorial();
+    });
+
+    // ESC closes it
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && tutorialScreen.style.display === "flex") {
+        closeTutorial();
+      }
+    });
+
+    // ---------- Background grid ----------
     const bg = document.getElementById("bg");
     const bctx = bg.getContext("2d");
 
@@ -343,9 +450,9 @@
         bctx.lineTo(bg.width, y);
         bctx.stroke();
       }
+
       requestAnimationFrame(drawGrid);
     }
-
     drawGrid();
   </script>
 
