@@ -18,7 +18,7 @@ resize();
 
 type PlayerState = { id: string; name: string; x: number; y: number; hp: number };
 
-const START_HP = 100_000; // change to 10_000 if you want client-side display; server should match too
+const START_HP = 10_000;
 
 let myId: string | null = null;
 let myName = "";
@@ -30,30 +30,24 @@ let joined = false;
 let mouseX = window.innerWidth / 2;
 let mouseY = window.innerHeight / 2;
 
-// Keep a local map of player states (server authority)
 const players = new Map<string, PlayerState>();
 
-// Render smoothing buffers for other players (prevents jitter)
 type Smooth = { x: number; y: number; tx: number; ty: number };
 const smooth = new Map<string, Smooth>();
 
-// Server URL
 const WS_URL =
   location.hostname === "localhost"
     ? "ws://localhost:8080"
     : "wss://snapaim.onrender.com";
 
-// Heartbeat keeps server position fresh even if pointermove doesn't fire
 let heartbeat: number | null = null;
 
-// --- Helpers: protocol compatibility ---
 function msgType(msg: any): string | undefined {
   return msg?.t ?? msg?.type;
 }
 
 function wsSend(payload: any) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  // Send both "t" and "type" so either server version understands
   const out = { ...payload };
   if (out.t && !out.type) out.type = out.t;
   if (out.type && !out.t) out.t = out.type;
@@ -70,11 +64,9 @@ function startGame() {
   const clean = nameInput.value.trim().slice(0, 18);
   myName = clean.length ? clean : "Player";
 
-  // Initial position
   mouseX = window.innerWidth / 2;
   mouseY = window.innerHeight / 2;
 
-  // Immediately stop "Loading..." visually
   hudName.textContent = myName;
 
   menu.style.display = "none";
@@ -95,12 +87,10 @@ function connect() {
   ws = new WebSocket(WS_URL);
 
   ws.addEventListener("open", () => {
-    // Heartbeat
     heartbeat = window.setInterval(() => {
       wsSend({ t: "move", x: mouseX, y: mouseY });
     }, 50);
 
-    // Ask server to set name / move immediately (works even if server doesn't send welcome first)
     wsSend({ t: "setName", name: myName });
     wsSend({ t: "move", x: mouseX, y: mouseY });
   });
@@ -125,7 +115,6 @@ function connect() {
       for (const p of list) {
         players.set(p.id, p);
 
-        // smoothing for others
         if (p.id !== myId) {
           const s = smooth.get(p.id);
           if (!s) smooth.set(p.id, { x: p.x, y: p.y, tx: p.x, ty: p.y });
@@ -136,7 +125,6 @@ function connect() {
         }
       }
 
-      // If welcome is missing, infer myId by matching name + closeness
       if (joined && !myId) {
         let best: { id: string; d2: number } | null = null;
 
@@ -148,14 +136,12 @@ function connect() {
           if (!best || d2 < best.d2) best = { id: p.id, d2 };
         }
 
-        // only lock if plausible
         if (best && best.d2 < (hitRadius * 6) * (hitRadius * 6)) {
           myId = best.id;
           wsSend({ t: "setName", name: myName });
         }
       }
 
-      // cleanup
       const alive = new Set(list.map((p) => p.id));
       for (const id of smooth.keys()) if (!alive.has(id)) smooth.delete(id);
       for (const id of players.keys()) if (!alive.has(id)) players.delete(id);
@@ -189,7 +175,6 @@ function connect() {
   });
 }
 
-// Ensure close message reaches server quickly
 window.addEventListener("beforeunload", () => {
   try {
     ws?.close();
@@ -227,11 +212,9 @@ function drawOtherHealthBar(x: number, y: number, hp: number) {
   const bx = x - w / 2;
   const by = y - hitRadius - 24;
 
-  // background
   ctx.fillStyle = "rgba(0,0,0,0.65)";
   ctx.fillRect(bx, by, w, h);
 
-  // bar color
   let color: string;
   if (pct > 0.6) color = "#3ddc84";
   else if (pct > 0.3) color = "#f5c542";
@@ -240,12 +223,10 @@ function drawOtherHealthBar(x: number, y: number, hp: number) {
   ctx.fillStyle = color;
   ctx.fillRect(bx, by, w * pct, h);
 
-  // outline around bar (same vibe as name)
   ctx.lineWidth = 3;
   ctx.strokeStyle = "rgba(55,55,55,0.95)";
   ctx.strokeRect(bx, by, w, h);
 
-  // HP number inside
   const text = Math.round(hp).toLocaleString();
 
   ctx.font = "9px Ubuntu, system-ui";
@@ -265,9 +246,13 @@ function drawOtherHealthBar(x: number, y: number, hp: number) {
 function updateBottomHud() {
   if (!joined) return;
 
-  // if we haven't locked our id yet, don't freeze on Loading...
   if (!myId) {
     hudName.textContent = myName || "Loading...";
+    hudHpText.textContent = `${START_HP.toLocaleString()} / ${START_HP.toLocaleString()} HP`;
+    hpBarInner.style.width = "100%";
+    hpBarInner.style.backgroundImage = "none";
+    hpBarInner.style.background = "hsl(120, 85%, 55%)";
+    hpBarInner.style.opacity = "1";
     return;
   }
 
@@ -289,14 +274,12 @@ function updateBottomHud() {
 function loop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // smooth others
   const SMOOTH = 0.18;
   for (const s of smooth.values()) {
     s.x += (s.tx - s.x) * SMOOTH;
     s.y += (s.ty - s.y) * SMOOTH;
   }
 
-  // draw everyone except you (only when myId known)
   for (const p of players.values()) {
     if (myId && p.id === myId) continue;
 
@@ -306,13 +289,11 @@ function loop() {
 
     ctx.save();
 
-    // player
     ctx.beginPath();
     ctx.arc(x, y, hitRadius, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(90,240,150,0.95)";
     ctx.fill();
 
-    // name under (outlined)
     const label = (p.name && p.name.trim().length) ? p.name : p.id.slice(0, 4);
 
     ctx.font = "12px Ubuntu, system-ui";
@@ -328,7 +309,6 @@ function loop() {
 
     ctx.restore();
 
-    // hp bar above
     drawOtherHealthBar(x, y, p.hp);
   }
 

@@ -17,7 +17,7 @@ type WebSocket = import("ws").WebSocket;
 const PORT = Number(process.env.PORT ?? 8080);
 
 // Gameplay constants
-const START_HP = 100_000;
+const START_HP = 10_000;
 const HIT_RADIUS = 22;            // cursor hitbox radius (px)
 const HISTORY_MS = 250;           // keep ~250ms of movement samples
 const SPEED_WINDOW_MS = 120;      // compute speed over last ~120ms
@@ -115,7 +115,6 @@ wss.on("connection", (ws) => {
 
     if (msg.t === "click") {
       // On click, server computes damage from server-tracked speed.
-      // (Clients do NOT send damage.)
       const spd = computeSpeedPxPerSec(p, tNow);
       const dmg = Math.round(clamp(spd, 0, MAX_SPEED_FOR_DAMAGE)); // damage = speed
 
