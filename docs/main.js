@@ -1,5 +1,5 @@
 "use strict";
-console.log("BUILD_MARKER_FINAL");
+console.log("BUILD_MARKER_1");
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 const menu = document.getElementById("menu");
@@ -21,7 +21,7 @@ let ws = null;
 let joined = false;
 let mouseX = window.innerWidth / 2;
 let mouseY = window.innerHeight / 2;
-// server-authoritative max HP (ONLY from server)
+// server-authoritative max HP for MY player (set ONLY from welcome/state)
 let myMaxHp = null;
 const players = new Map();
 const smooth = new Map();
@@ -35,9 +35,14 @@ function msgType(msg) {
 function wsSend(payload) {
     if (!ws || ws.readyState !== WebSocket.OPEN)
         return;
-    ws.send(JSON.stringify(payload));
+    const out = { ...payload };
+    if (out.t && !out.type)
+        out.type = out.t;
+    if (out.type && !out.t)
+        out.t = out.type;
+    ws.send(JSON.stringify(out));
 }
-// ---------- JOIN ----------
+// --- Join/Menu ---
 nameInput.focus();
 function startGame() {
     if (joined)
@@ -47,10 +52,13 @@ function startGame() {
     myName = clean.length ? clean : "Player";
     mouseX = window.innerWidth / 2;
     mouseY = window.innerHeight / 2;
+    // UI feedback immediately
     hudName.textContent = myName || "Loading...";
     hudHpText.textContent = "Connecting...";
     hpBarInner.style.width = "100%";
-    hpBarInner.style.background = "hsl(120,85%,55%)";
+    hpBarInner.style.backgroundImage = "none";
+    hpBarInner.style.background = "hsl(120, 85%, 55%)";
+    hpBarInner.style.opacity = "1";
     menu.style.display = "none";
     hudBottom.style.display = "flex";
     connect();
@@ -61,10 +69,11 @@ nameInput.addEventListener("keydown", (e) => {
         startGame();
     }
 });
-// ---------- SOCKET ----------
+// --- WebSocket ---
 function connect() {
     ws = new WebSocket(WS_URL);
     ws.addEventListener("open", () => {
+        // heartbeat keeps server position fresh
         heartbeat = window.setInterval(() => {
             wsSend({ t: "move", x: mouseX, y: mouseY });
         }, 50);
@@ -74,53 +83,53 @@ function connect() {
     ws.addEventListener("message", (ev) => {
         const msg = JSON.parse(ev.data);
         const t = msgType(msg);
-        // ---------- WELCOME ----------
         if (t === "welcome") {
-            if (typeof msg.id === "string")
-                myId = msg.id;
-            if (typeof msg.hitRadius === "number")
-                hitRadius = msg.hitRadius;
-            if (typeof msg.maxHp === "number") {
+            myId = typeof msg.id === "string" ? msg.id : myId;
+            hitRadius = typeof msg.hitRadius === "number" ? msg.hitRadius : hitRadius;
+            // IMPORTANT: max HP is ONLY set from server
+            if (typeof msg.maxHp === "number" && msg.maxHp > 0) {
                 myMaxHp = msg.maxHp;
             }
+            else if (typeof msg.hp === "number" && msg.hp > 0 && myMaxHp === null) {
+                // fallback only if server didn't send maxHp (older server)
+                myMaxHp = msg.hp;
+            }
+            wsSend({ t: "setName", name: myName });
+            wsSend({ t: "move", x: mouseX, y: mouseY });
             return;
         }
-        // ---------- STATE ----------
         if (t === "state") {
             const list = msg.players;
             if (!Array.isArray(list))
                 return;
+            // update maps
             for (const p of list) {
                 players.set(p.id, p);
+                // init smoothing for others
                 if (p.id !== myId) {
                     const s = smooth.get(p.id);
-                    if (!s) {
+                    if (!s)
                         smooth.set(p.id, { x: p.x, y: p.y, tx: p.x, ty: p.y });
-                    }
                     else {
                         s.tx = p.x;
                         s.ty = p.y;
                     }
                 }
             }
-            // Recover myId if welcome was missed
-            if (!myId) {
-                for (const p of list) {
-                    if ((p.name ?? "").trim() === myName) {
-                        myId = p.id;
-                        break;
+            // If we have myId, lock myMaxHp from my own state (server authority)
+            if (myId) {
+                const me = list.find((p) => p.id === myId);
+                if (me) {
+                    if (typeof me.maxHp === "number" && me.maxHp > 0) {
+                        myMaxHp = me.maxHp;
+                    }
+                    else if (myMaxHp === null && typeof me.hp === "number" && me.hp > 0) {
+                        // fallback for older servers
+                        myMaxHp = me.hp;
                     }
                 }
             }
-            // Lock maxHp ONLY from server
-            if (myId) {
-                const me = list.find((p) => p.id === myId);
-                if (me &&
-                    typeof me.maxHp === "number" &&
-                    me.maxHp > 0) {
-                    myMaxHp = me.maxHp;
-                }
-            }
+            // cleanup vanished
             const alive = new Set(list.map((p) => p.id));
             for (const id of smooth.keys())
                 if (!alive.has(id))
@@ -130,24 +139,25 @@ function connect() {
                     players.delete(id);
             return;
         }
-        // ---------- HIT ----------
         if (t === "hit") {
-            const to = msg.to;
-            const hp = msg.hp;
+            const to = msg.to ?? msg.target ?? msg.id;
+            const hp = msg.hp ?? msg.newHp ?? msg.health;
             if (typeof to === "string" && typeof hp === "number") {
                 const target = players.get(to);
                 if (target)
                     target.hp = hp;
             }
+            return;
         }
     });
     ws.addEventListener("close", () => {
-        if (heartbeat)
+        if (heartbeat !== null) {
             clearInterval(heartbeat);
-        heartbeat = null;
+            heartbeat = null;
+        }
     });
 }
-// ---------- INPUT ----------
+// --- Input ---
 let lastMoveSend = 0;
 const MOVE_SEND_MS = 50;
 window.addEventListener("pointermove", (e) => {
@@ -164,37 +174,56 @@ window.addEventListener("pointerdown", (e) => {
         return;
     wsSend({ t: "click", x: e.clientX, y: e.clientY });
 });
-// ---------- RENDER ----------
+// --- Rendering helpers ---
+function maxHpForPlayer(p) {
+    // for other players, prefer their server-provided maxHp; otherwise fallback to myMaxHp; otherwise 1
+    if (typeof p.maxHp === "number" && p.maxHp > 0)
+        return p.maxHp;
+    if (myMaxHp !== null && myMaxHp > 0)
+        return myMaxHp;
+    return 1;
+}
 function drawOtherHealthBar(x, y, p) {
-    if (!myMaxHp)
-        return;
+    ctx.save();
+    const maxHp = maxHpForPlayer(p);
     const w = 70;
     const h = 15;
-    const pct = Math.max(0, Math.min(1, p.hp / myMaxHp));
+    const pct = Math.max(0, Math.min(1, p.hp / maxHp));
     const bx = x - w / 2;
     const by = y - hitRadius - 24;
+    // background
     ctx.fillStyle = "rgba(0,0,0,0.65)";
     ctx.fillRect(bx, by, w, h);
-    const color = pct > 0.6 ? "#3ddc84" :
-        pct > 0.3 ? "#f5c542" :
-            "#ff4d4d";
+    // color based on HP %
+    let color;
+    if (pct > 0.6)
+        color = "#3ddc84";
+    else if (pct > 0.3)
+        color = "#f5c542";
+    else
+        color = "#ff4d4d";
     ctx.fillStyle = color;
     ctx.fillRect(bx, by, w * pct, h);
+    // thick outline (same vibe as player name outline)
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(55,55,55,0.95)";
     ctx.strokeRect(bx, by, w, h);
+    // HP text inside bar
     const text = Math.round(p.hp).toLocaleString();
     ctx.font = "9px Ubuntu, system-ui";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(55,55,55,0.95)";
     ctx.strokeText(text, bx + w / 2, by + h / 2);
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
     ctx.fillText(text, bx + w / 2, by + h / 2);
+    ctx.restore();
 }
 function updateBottomHud() {
     if (!joined)
         return;
-    if (!myId || !myMaxHp) {
+    if (!myId) {
         hudName.textContent = myName || "Loading...";
         hudHpText.textContent = "Connecting...";
         return;
@@ -202,29 +231,50 @@ function updateBottomHud() {
     const me = players.get(myId);
     if (!me)
         return;
-    hudName.textContent = me.name || myName;
-    hudHpText.textContent = `${me.hp.toLocaleString()} / ${myMaxHp.toLocaleString()} HP`;
-    const pct = Math.max(0, Math.min(1, me.hp / myMaxHp));
+    // IMPORTANT: bottom HUD uses myMaxHp (server authority)
+    const maxHp = (myMaxHp !== null && myMaxHp > 0) ? myMaxHp : maxHpForPlayer(me);
+    hudName.textContent = me.name || myName || "Player";
+    hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${Math.round(maxHp).toLocaleString()} HP`;
+    const pct = Math.max(0, Math.min(1, me.hp / maxHp));
     hpBarInner.style.width = `${pct * 100}%`;
-    hpBarInner.style.background = `hsl(${pct * 120},85%,55%)`;
+    const hue = pct * 120;
+    hpBarInner.style.backgroundImage = "none";
+    hpBarInner.style.background = `hsl(${hue}, 85%, 55%)`;
+    hpBarInner.style.opacity = "1";
 }
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // smooth other players
     const SMOOTH = 0.18;
     for (const s of smooth.values()) {
         s.x += (s.tx - s.x) * SMOOTH;
         s.y += (s.ty - s.y) * SMOOTH;
     }
+    // draw everyone except you
     for (const p of players.values()) {
-        if (p.id === myId)
+        if (myId && p.id === myId)
             continue;
         const s = smooth.get(p.id);
         const x = s ? s.x : p.x;
         const y = s ? s.y : p.y;
+        // hitbox circle
+        ctx.save();
         ctx.beginPath();
         ctx.arc(x, y, hitRadius, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(90,240,150,0.95)";
         ctx.fill();
+        // name label under (outlined)
+        const label = (p.name && p.name.trim().length) ? p.name : p.id.slice(0, 4);
+        ctx.font = "12px Ubuntu, system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "alphabetic";
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(55,55,55,0.95)";
+        ctx.strokeText(label, x, y + hitRadius + 14);
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.fillText(label, x, y + hitRadius + 14);
+        ctx.restore();
+        // other player's health bar
         drawOtherHealthBar(x, y, p);
     }
     updateBottomHud();
