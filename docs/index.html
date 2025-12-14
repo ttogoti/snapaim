@@ -11,173 +11,145 @@
   <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
 
   <style>
-    :root{
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
       font-family: "Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
 
     html, body {
       height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: #ffffff;
     }
 
-    body{
-      margin:0;
-      overflow:hidden;
-      background:#0b0f14;
-      font-family: "Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    /* Background grid canvas (behind everything) */
+    #bg {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      z-index: 0;
     }
 
-    /* Canvas full screen */
-    #c{
-      position:fixed;
-      inset:0;
-      width:100vw;
-      height:100vh;
-      display:block;
+    /* Game canvas (your main.ts uses this) */
+    #c {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      z-index: 1;
     }
 
-    /* Menu overlay */
-    #menu{
-      position:fixed;
-      inset:0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background: radial-gradient(1200px 700px at 50% 40%, rgba(40,60,90,0.35), rgba(10,14,20,0.92));
-      z-index:10;
+    /* Menu overlay: ONLY the textbox */
+    #menu {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      background: transparent; /* no card, no vignette */
     }
 
-    .menuCard{
-      width:min(520px, calc(100vw - 48px));
-      border-radius:16px;
-      padding:22px 20px 18px;
-      background: rgba(10,12,16,0.68);
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 16px 60px rgba(0,0,0,0.55);
-      backdrop-filter: blur(10px);
+    #nameInput {
+      width: min(520px, calc(100vw - 80px));
+      height: 62px;
+
+      background: #ffffff;
+      color: #000000;
+
+      border: 2px solid #b0b0b0; /* grey outline */
+      border-radius: 0;          /* rectangle */
+      outline: none;
+
+      font-size: 22px;
+      font-weight: 600;
+      text-align: center;        /* center placeholder + input text */
     }
 
-    .title{
-      font-weight:700;
-      font-size:20px;
-      color:rgba(255,255,255,0.92);
-      margin-bottom:6px;
-      letter-spacing:0.2px;
+    #nameInput::placeholder {
+      color: #7a7a7a;
+      font-weight: 500;
     }
 
-    .subtitle{
-      font-weight:400;
-      font-size:13px;
-      line-height:1.35;
-      color:rgba(255,255,255,0.70);
-      margin-bottom:12px;
+    /* Keep your HUD in DOM so main.ts doesn't crash.
+       You can style it however you like later. */
+    #hudBottom {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%);
+      width: min(860px, calc(100vw - 48px));
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 3;
     }
 
-    #nameInput{
-      width:100%;
-      height:40px;
-      border-radius:10px;
-      border: 1px solid rgba(255,255,255,0.10);
-      background: rgba(0,0,0,0.35);
-      color: rgba(255,255,255,0.92);
-      padding: 0 12px;
-      outline:none;
-      font-family: "Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      font-size:14px;
+    #hudName {
+      width: 100%;
+      text-align: center;
+      font-weight: 700;
+      font-size: 18px;
+      color: rgba(0,0,0,0.85);
     }
 
-    #nameInput:focus{
-      border-color: rgba(120,170,255,0.55);
-      box-shadow: 0 0 0 3px rgba(120,170,255,0.18);
+    #hpBarWrap { width: 100%; display: flex; justify-content: center; }
+
+    #hpBarOuter {
+      position: relative;
+      width: 100%;
+      height: 18px;
+      border-radius: 0;
+      overflow: hidden;
+      background: rgba(0,0,0,0.08);
+      border: 1px solid rgba(0,0,0,0.12);
     }
 
-    .hint{
-      margin-top:10px;
-      font-size:12px;
-      color:rgba(255,255,255,0.55);
+    #hpBarInner {
+      height: 100%;
+      width: 100%;
+      background: #3ddc84;
+      background-image: none;
+      opacity: 1;
     }
 
-    /* Bottom HUD: no background container, centered */
-    #hudBottom{
-      position:fixed;
-      left:50%;
-      bottom:28px;
-      transform:translateX(-50%);
-      width:min(860px, calc(100vw - 48px));
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      gap:10px;
-      pointer-events:none;
-      z-index:5;
-    }
-
-    /* Username centered above bar */
-    #hudName{
-      width:100%;
-      text-align:center;
-      font-weight:700;
-      font-size:18px;
-      letter-spacing:0.2px;
-      color:rgba(255,255,255,0.92);
-      text-shadow:0 1px 10px rgba(0,0,0,0.60);
-    }
-
-    /* Bar container */
-    #hpBarWrap{
-      width:100%;
-      display:flex;
-      justify-content:center;
-    }
-
-    #hpBarOuter{
-      position:relative;
-      width:100%;
-      height:18px;
-      border-radius:10px;
-      overflow:hidden;
-      background:rgba(255,255,255,0.08);
-      box-shadow:0 6px 18px rgba(0,0,0,0.35);
-    }
-
-    /* Filled portion (JS controls width + color) */
-    #hpBarInner{
-      height:100%;
-      width:100%;
-      background:#3ddc84;
-      background-image:none;
-      opacity:1;
-    }
-
-    /* HP text centered ON TOP of bar */
-    #hudHpText{
-      position:absolute;
-      inset:0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-weight:500;
-      font-size:13px;
-      color:rgba(255,255,255,0.92);
-      text-shadow:0 1px 10px rgba(0,0,0,0.65);
-      z-index:2;
-      user-select:none;
+    #hudHpText {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 13px;
+      color: rgba(0,0,0,0.85);
+      user-select: none;
+      z-index: 2;
     }
   </style>
 </head>
 
 <body>
+  <!-- Background grid -->
+  <canvas id="bg"></canvas>
+
+  <!-- Game canvas -->
   <canvas id="c"></canvas>
 
+  <!-- Minimal menu -->
   <div id="menu">
-    <div class="menuCard">
-      <div class="title">SnapAim</div>
-      <div class="subtitle">Enter a username, press Enter, then move &amp; click to fight.</div>
-      <input id="nameInput" maxlength="18" placeholder="username" />
-      <div class="hint">Tip: on free Render, the server may “wake up” the first time.</div>
-    </div>
+    <input id="nameInput" maxlength="18" placeholder="Good luck, ..." />
   </div>
 
-  <div id="hudBottom" style="display:none;">
+  <!-- HUD (kept for main.ts) -->
+  <div id="hudBottom">
     <div id="hudName">player</div>
 
     <div id="hpBarWrap">
@@ -188,6 +160,62 @@
     </div>
   </div>
 
+  <!-- Moving grid renderer (does NOT touch game canvas) -->
+  <script>
+    const bg = document.getElementById("bg");
+    const bctx = bg.getContext("2d");
+
+    function resizeBg() {
+      bg.width = window.innerWidth;
+      bg.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeBg);
+    resizeBg();
+
+    let ox = 0;
+    let oy = 0;
+
+    const spacing = 40;     // grid size
+    const speed = 0.22;     // drift speed (top-left)
+
+    function drawGrid() {
+      bctx.clearRect(0, 0, bg.width, bg.height);
+
+      // white background
+      bctx.fillStyle = "#ffffff";
+      bctx.fillRect(0, 0, bg.width, bg.height);
+
+      // grid lines
+      bctx.strokeStyle = "#e2e2e2";
+      bctx.lineWidth = 1;
+
+      ox -= speed;
+      oy -= speed;
+
+      if (ox <= -spacing) ox += spacing;
+      if (oy <= -spacing) oy += spacing;
+
+      for (let x = ox; x < bg.width; x += spacing) {
+        bctx.beginPath();
+        bctx.moveTo(x, 0);
+        bctx.lineTo(x, bg.height);
+        bctx.stroke();
+      }
+
+      for (let y = oy; y < bg.height; y += spacing) {
+        bctx.beginPath();
+        bctx.moveTo(0, y);
+        bctx.lineTo(bg.width, y);
+        bctx.stroke();
+      }
+
+      requestAnimationFrame(drawGrid);
+    }
+
+    drawGrid();
+  </script>
+
+  <!-- Your compiled TS -->
   <script src="./main.js" defer></script>
 </body>
 </html>
