@@ -181,12 +181,12 @@ window.addEventListener("pointerdown", (e) => {
 
 // --- Rendering ---
   function drawOtherHealthBar(x: number, y: number, hp: number) {
-  const w = 100;
-  const h = 10;
+  const w = 70;
+  const h = 15;
   const pct = Math.max(0, Math.min(1, hp / START_HP));
 
   const bx = x - w / 2;
-  const by = y - hitRadius - 20;
+  const by = y - hitRadius - 24;
 
   // background
   ctx.fillStyle = "rgba(0,0,0,0.65)";
@@ -203,7 +203,7 @@ window.addEventListener("pointerdown", (e) => {
 
     // HP number INSIDE the bar (centered)
   ctx.fillStyle = "rgba(255,255,255,0.95)";
-  ctx.font = "9px Ubuntu, system-ui";
+  ctx.font = "11px Ubuntu, system-ui";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
