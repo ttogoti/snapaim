@@ -201,16 +201,29 @@ function drawOtherHealthBar(x: number, y: number, hp: number) {
   ctx.fillStyle = color;
   ctx.fillRect(bx, by, w * pct, h);
 
-  // HP number INSIDE the bar (centered) — NO OUTLINE
+  // THICK DARK GREY OUTLINE around the healthbar (other players only)
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "rgba(55,55,55,0.95)";
+  ctx.strokeRect(bx, by, w, h);
+
+  // HP number INSIDE the bar (centered) — with same thick outline as player name
   const text = Math.round(hp).toLocaleString();
 
   ctx.font = "9px Ubuntu, system-ui";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+
+  // outline
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "rgba(55,55,55,0.95)";
+  ctx.strokeText(text, bx + w / 2, by + h / 2);
+
+  // fill
   ctx.fillStyle = "rgba(255,255,255,0.95)";
   ctx.fillText(text, bx + w / 2, by + h / 2);
 
-  // reset alignment
+  // reset state
+  ctx.lineWidth = 1;
   ctx.textAlign = "start";
   ctx.textBaseline = "alphabetic";
 }
@@ -279,7 +292,7 @@ function loop() {
     ctx.textAlign = "start";
     ctx.textBaseline = "alphabetic";
 
-    // bar + hp number above
+    // bar + hp number above (other players only)
     drawOtherHealthBar(x, y, p.hp);
   }
 
