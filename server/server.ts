@@ -4,15 +4,17 @@ import { randomUUID } from "crypto";
 type Vec2 = { x: number; y: number };
 type Sample = { t: number; p: Vec2 };
 
+type WebSocket = import("ws").WebSocket;
+
 type Player = {
   id: string;
   ws: WebSocket;
+  name: string;
   pos: Vec2;
   hp: number;
+  maxHp: number;
   history: Sample[]; // rolling window for speed
 };
-
-type WebSocket = import("ws").WebSocket;
 
 const PORT = Number(process.env.PORT ?? 8080);
 
@@ -23,8 +25,7 @@ const HISTORY_MS = 250;           // keep ~250ms of movement samples
 const SPEED_WINDOW_MS = 120;      // compute speed over last ~120ms
 const MAX_REPORTED_COORD = 100000;
 
-// Safety: if you truly want unlimited damage, set this very high.
-// Keeping a cap prevents trivial cheating (client can spam teleports).
+// Anti-cheat safety cap
 const MAX_SPEED_FOR_DAMAGE = 50_000; // px/s
 
 const wss = new WebSocketServer({ port: PORT });
@@ -34,6 +35,21 @@ function nowMs() { return Date.now(); }
 function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
 function dist(a: Vec2, b: Vec2) { return Math.hypot(a.x - b.x, a.y - b.y); }
 
+function msgType(msg: any): string | undefined {
+  return msg?.t ?? msg?.type;
+}
+
+function send(ws: WebSocket, obj: any) {
+  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
+}
+
+function broadcast(obj: any) {
+  const msg = JSON.stringify(obj);
+  for (const p of players.values()) {
+    if (p.ws.readyState === p.ws.OPEN) p.ws.send(msg);
+  }
+}
+
 function pruneHistory(p: Player, t: number) {
   const cutoff = t - HISTORY_MS;
   while (p.history.length && p.history[0].t < cutoff) p.history.shift();
@@ -42,7 +58,6 @@ function pruneHistory(p: Player, t: number) {
 function computeSpeedPxPerSec(p: Player, tEnd: number) {
   const tStart = tEnd - SPEED_WINDOW_MS;
 
-  // pick first sample >= tStart and last sample <= tEnd
   let first: Sample | null = null;
   let last: Sample | null = null;
 
@@ -57,23 +72,14 @@ function computeSpeedPxPerSec(p: Player, tEnd: number) {
   return dt > 0 ? d / dt : 0;
 }
 
-function send(ws: WebSocket, obj: any) {
-  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
-}
-
-function broadcast(obj: any) {
-  const msg = JSON.stringify(obj);
-  for (const p of players.values()) {
-    if (p.ws.readyState === p.ws.OPEN) p.ws.send(msg);
-  }
-}
-
 function snapshot() {
-  return Array.from(players.values()).map(p => ({
+  return Array.from(players.values()).map((p) => ({
     id: p.id,
+    name: p.name,
     x: p.pos.x,
     y: p.pos.y,
-    hp: p.hp
+    hp: p.hp,
+    maxHp: p.maxHp
   }));
 }
 
@@ -84,15 +90,19 @@ wss.on("connection", (ws) => {
   const p: Player = {
     id,
     ws,
+    name: "Player",
     pos: { x: 0, y: 0 },
     hp: START_HP,
+    maxHp: START_HP,
     history: [{ t, p: { x: 0, y: 0 } }]
   };
 
   players.set(id, p);
-  send(ws, { t: "welcome", id, hp: START_HP, hitRadius: HIT_RADIUS });
 
-  // Tell everyone someone joined
+  // welcome includes authoritative maxHp so clients never guess
+  send(ws, { t: "welcome", id, hp: p.hp, maxHp: p.maxHp, hitRadius: HIT_RADIUS });
+
+  // broadcast state so everyone sees join
   broadcast({ t: "state", players: snapshot() });
 
   ws.on("message", (raw: Buffer) => {
@@ -100,8 +110,16 @@ wss.on("connection", (ws) => {
     try { msg = JSON.parse(raw.toString("utf8")); } catch { return; }
 
     const tNow = nowMs();
+    const type = msgType(msg);
 
-    if (msg.t === "move") {
+    if (type === "setName") {
+      if (typeof msg.name !== "string") return;
+      const clean = msg.name.trim().slice(0, 18);
+      p.name = clean.length ? clean : "Player";
+      return;
+    }
+
+    if (type === "move") {
       if (typeof msg.x !== "number" || typeof msg.y !== "number") return;
 
       const x = clamp(msg.x, -MAX_REPORTED_COORD, MAX_REPORTED_COORD);
@@ -113,12 +131,10 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    if (msg.t === "click") {
-      // On click, server computes damage from server-tracked speed.
+    if (type === "click") {
       const spd = computeSpeedPxPerSec(p, tNow);
-      const dmg = Math.round(clamp(spd, 0, MAX_SPEED_FOR_DAMAGE)); // damage = speed
+      const dmg = Math.round(clamp(spd, 0, MAX_SPEED_FOR_DAMAGE));
 
-      // find a target whose hitbox contains the click point (or attacker pos if no click coords)
       let clickPos: Vec2 = p.pos;
       if (typeof msg.x === "number" && typeof msg.y === "number") {
         clickPos = {
@@ -127,7 +143,6 @@ wss.on("connection", (ws) => {
         };
       }
 
-      // pick nearest target within HIT_RADIUS of clickPos
       let target: Player | null = null;
       let best = Infinity;
 
@@ -168,4 +183,4 @@ setInterval(() => {
   broadcast({ t: "state", players: snapshot() });
 }, 1000 / 30);
 
-console.log(`Server running on ws://localhost:${PORT}`);
+console.log(`Server running on ws://localhost:${PORT} | START_HP=${START_HP}`);

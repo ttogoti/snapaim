@@ -16,9 +16,14 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-type PlayerState = { id: string; name: string; x: number; y: number; hp: number };
-
-const START_HP = 10_000;
+type PlayerState = {
+  id: string;
+  name?: string;
+  x: number;
+  y: number;
+  hp: number;
+  maxHp?: number;
+};
 
 let myId: string | null = null;
 let myName = "";
@@ -34,6 +39,9 @@ const players = new Map<string, PlayerState>();
 
 type Smooth = { x: number; y: number; tx: number; ty: number };
 const smooth = new Map<string, Smooth>();
+
+// Authoritative max HP (from server)
+let myMaxHp = 0;
 
 const WS_URL =
   location.hostname === "localhost"
@@ -67,7 +75,13 @@ function startGame() {
   mouseX = window.innerWidth / 2;
   mouseY = window.innerHeight / 2;
 
+  // immediate UI feedback
   hudName.textContent = myName;
+  hudHpText.textContent = `Connecting...`;
+  hpBarInner.style.width = `100%`;
+  hpBarInner.style.backgroundImage = "none";
+  hpBarInner.style.background = `hsl(120, 85%, 55%)`;
+  hpBarInner.style.opacity = "1";
 
   menu.style.display = "none";
   hudBottom.style.display = "block";
@@ -100,8 +114,11 @@ function connect() {
     const t = msgType(msg);
 
     if (t === "welcome") {
-      myId = msg.id;
+      myId = msg.id ?? myId;
       hitRadius = msg.hitRadius ?? hitRadius;
+
+      if (typeof msg.maxHp === "number") myMaxHp = msg.maxHp;
+      else if (typeof msg.hp === "number") myMaxHp = Math.max(myMaxHp, msg.hp);
 
       wsSend({ t: "setName", name: myName });
       wsSend({ t: "move", x: mouseX, y: mouseY });
@@ -109,7 +126,7 @@ function connect() {
     }
 
     if (t === "state") {
-      const list = (msg.players ?? msg.state ?? msg.data) as PlayerState[] | undefined;
+      const list = msg.players as PlayerState[] | undefined;
       if (!Array.isArray(list)) return;
 
       for (const p of list) {
@@ -125,23 +142,38 @@ function connect() {
         }
       }
 
-      if (joined && !myId) {
-        let best: { id: string; d2: number } | null = null;
+      // If we missed welcome, infer myId from name + closeness
+      if (joined && !myId && myName) {
+        let bestId: string | null = null;
+        let bestD = Infinity;
 
         for (const p of list) {
           if ((p.name || "").trim() !== myName) continue;
           const dx = p.x - mouseX;
           const dy = p.y - mouseY;
           const d2 = dx * dx + dy * dy;
-          if (!best || d2 < best.d2) best = { id: p.id, d2 };
+          if (d2 < bestD) {
+            bestD = d2;
+            bestId = p.id;
+          }
         }
 
-        if (best && best.d2 < (hitRadius * 6) * (hitRadius * 6)) {
-          myId = best.id;
+        if (bestId && bestD < (hitRadius * 6) * (hitRadius * 6)) {
+          myId = bestId;
           wsSend({ t: "setName", name: myName });
         }
       }
 
+      // lock myMaxHp from my own state (authoritative)
+      if (myId) {
+        const me = list.find((p) => p.id === myId);
+        if (me) {
+          if (typeof me.maxHp === "number") myMaxHp = me.maxHp;
+          else if (myMaxHp === 0) myMaxHp = Math.max(1, me.hp);
+        }
+      }
+
+      // cleanup
       const alive = new Set(list.map((p) => p.id));
       for (const id of smooth.keys()) if (!alive.has(id)) smooth.delete(id);
       for (const id of players.keys()) if (!alive.has(id)) players.delete(id);
@@ -166,20 +198,7 @@ function connect() {
       heartbeat = null;
     }
   });
-
-  ws.addEventListener("error", () => {
-    if (heartbeat !== null) {
-      clearInterval(heartbeat);
-      heartbeat = null;
-    }
-  });
 }
-
-window.addEventListener("beforeunload", () => {
-  try {
-    ws?.close();
-  } catch {}
-});
 
 // --- Input ---
 let lastMoveSend = 0;
@@ -201,13 +220,20 @@ window.addEventListener("pointerdown", (e) => {
   wsSend({ t: "click", x: e.clientX, y: e.clientY });
 });
 
-// --- Rendering ---
-function drawOtherHealthBar(x: number, y: number, hp: number) {
+// --- Rendering helpers ---
+function getMaxHpFor(p: PlayerState) {
+  if (typeof p.maxHp === "number" && p.maxHp > 0) return p.maxHp;
+  if (myId && p.id === myId && myMaxHp > 0) return myMaxHp;
+  return myMaxHp > 0 ? myMaxHp : 1;
+}
+
+function drawOtherHealthBar(x: number, y: number, p: PlayerState) {
   ctx.save();
 
+  const maxHp = getMaxHpFor(p);
   const w = 70;
   const h = 15;
-  const pct = Math.max(0, Math.min(1, hp / START_HP));
+  const pct = Math.max(0, Math.min(1, p.hp / maxHp));
 
   const bx = x - w / 2;
   const by = y - hitRadius - 24;
@@ -227,7 +253,7 @@ function drawOtherHealthBar(x: number, y: number, hp: number) {
   ctx.strokeStyle = "rgba(55,55,55,0.95)";
   ctx.strokeRect(bx, by, w, h);
 
-  const text = Math.round(hp).toLocaleString();
+  const text = Math.round(p.hp).toLocaleString();
 
   ctx.font = "9px Ubuntu, system-ui";
   ctx.textAlign = "center";
@@ -248,21 +274,19 @@ function updateBottomHud() {
 
   if (!myId) {
     hudName.textContent = myName || "Loading...";
-    hudHpText.textContent = `${START_HP.toLocaleString()} / ${START_HP.toLocaleString()} HP`;
-    hpBarInner.style.width = "100%";
-    hpBarInner.style.backgroundImage = "none";
-    hpBarInner.style.background = "hsl(120, 85%, 55%)";
-    hpBarInner.style.opacity = "1";
+    hudHpText.textContent = `Connecting...`;
     return;
   }
 
   const me = players.get(myId);
   if (!me) return;
 
-  hudName.textContent = me.name || myName || "Player";
-  hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${START_HP.toLocaleString()} HP`;
+  const maxHp = getMaxHpFor(me);
 
-  const pct = Math.max(0, Math.min(1, me.hp / START_HP));
+  hudName.textContent = me.name || myName || "Player";
+  hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${Math.round(maxHp).toLocaleString()} HP`;
+
+  const pct = Math.max(0, Math.min(1, me.hp / maxHp));
   hpBarInner.style.width = `${pct * 100}%`;
 
   const hue = pct * 120;
@@ -309,7 +333,7 @@ function loop() {
 
     ctx.restore();
 
-    drawOtherHealthBar(x, y, p.hp);
+    drawOtherHealthBar(x, y, p);
   }
 
   updateBottomHud();
