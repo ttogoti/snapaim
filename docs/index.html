@@ -133,6 +133,40 @@
       user-select: none;
       z-index: 2;
     }
+
+    /* --- SPEED BAR (NEW) --- */
+    #speedBarWrap { width: 100%; display: flex; justify-content: center; }
+
+    #speedBarOuter {
+      position: relative;
+      width: 100%;
+      height: 18px;
+      border-radius: 0;
+      overflow: hidden;
+      background: rgba(0,0,0,0.08);
+      border: 1px solid rgba(0,0,0,0.12);
+    }
+
+    #speedBarInner {
+      height: 100%;
+      width: 0%;
+      background: hsl(60, 95%, 55%); /* yellow default */
+      background-image: none;
+      opacity: 1;
+    }
+
+    #hudSpeedText {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 13px;
+      color: rgba(0,0,0,0.85);
+      user-select: none;
+      z-index: 2;
+    }
   </style>
 </head>
 
@@ -156,6 +190,14 @@
       <div id="hpBarOuter">
         <div id="hpBarInner"></div>
         <div id="hudHpText">100,000 / 100,000 HP</div>
+      </div>
+    </div>
+
+    <!-- NEW SPEED BAR -->
+    <div id="speedBarWrap">
+      <div id="speedBarOuter">
+        <div id="speedBarInner"></div>
+        <div id="hudSpeedText">Speed: 0/1000</div>
       </div>
     </div>
   </div>

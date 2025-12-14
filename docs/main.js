@@ -8,6 +8,9 @@ const hudBottom = document.getElementById("hudBottom");
 const hudName = document.getElementById("hudName");
 const hudHpText = document.getElementById("hudHpText");
 const hpBarInner = document.getElementById("hpBarInner");
+// NEW speed bar DOM refs (classic way like HP)
+const speedBarInner = document.getElementById("speedBarInner");
+const hudSpeedText = document.getElementById("hudSpeedText");
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -46,59 +49,53 @@ function wsSend(payload) {
 /* =========================
    SPEED BAR CONFIG (NEW)
    ========================= */
-const SPEED_MAX = 1000; // px/s -> full bar -> you die
-let speedOuter = null;
-let speedInner = null;
-let speedText = null;
-let lastSpeedSampleT = performance.now();
-let lastSpeedSampleX = mouseX;
-let lastSpeedSampleY = mouseY;
-let instantSpeed = 0; // px/s
-let smoothSpeed = 0; // px/s (nice up/down)
-function ensureSpeedBar() {
-    if (speedOuter && speedInner && speedText)
+const SPEED_MAX = 1000; // px/s => full bar => die
+let lastSpeedT = performance.now();
+let lastSpeedX = mouseX;
+let lastSpeedY = mouseY;
+let smoothSpeed = 0;
+// prevents instant death on join / first-frame jitter
+let joinTimeMs = performance.now();
+const SPEED_GRACE_MS = 650; // ignore speed-kill for first 0.65s
+function resetSpeedSampler() {
+    lastSpeedT = performance.now();
+    lastSpeedX = mouseX;
+    lastSpeedY = mouseY;
+    smoothSpeed = 0;
+    speedBarInner.style.width = "0%";
+    speedBarInner.style.backgroundImage = "none";
+    speedBarInner.style.background = "hsl(60, 95%, 55%)"; // yellow
+    speedBarInner.style.opacity = "1";
+    hudSpeedText.textContent = `Speed: 0/${SPEED_MAX}`;
+}
+function updateSpeedFromMouse() {
+    const tNow = performance.now();
+    const dt = tNow - lastSpeedT;
+    if (dt <= 0)
         return;
-    const hpBarWrap = document.getElementById("hpBarWrap");
-    if (!hpBarWrap)
-        return;
-    // Wrapper that matches hpBarWrap layout
-    const wrap = document.createElement("div");
-    wrap.style.width = "100%";
-    wrap.style.display = "flex";
-    wrap.style.justifyContent = "center";
-    // Outer matches hpBarOuter styling
-    speedOuter = document.createElement("div");
-    speedOuter.style.position = "relative";
-    speedOuter.style.width = "100%";
-    speedOuter.style.height = "18px";
-    speedOuter.style.borderRadius = "0";
-    speedOuter.style.overflow = "hidden";
-    speedOuter.style.background = "rgba(0,0,0,0.08)";
-    speedOuter.style.border = "1px solid rgba(0,0,0,0.12)";
-    // Inner matches hpBarInner styling (we'll control color)
-    speedInner = document.createElement("div");
-    speedInner.style.height = "100%";
-    speedInner.style.width = "0%";
-    speedInner.style.backgroundImage = "none";
-    speedInner.style.opacity = "1";
-    // Text overlay matches hudHpText styling
-    speedText = document.createElement("div");
-    speedText.style.position = "absolute";
-    speedText.style.inset = "0";
-    speedText.style.display = "flex";
-    speedText.style.alignItems = "center";
-    speedText.style.justifyContent = "center";
-    speedText.style.fontWeight = "600";
-    speedText.style.fontSize = "13px";
-    speedText.style.color = "rgba(0,0,0,0.85)";
-    speedText.style.userSelect = "none";
-    speedText.style.zIndex = "2";
-    speedText.textContent = `Speed: 0/${SPEED_MAX}`;
-    speedOuter.appendChild(speedInner);
-    speedOuter.appendChild(speedText);
-    wrap.appendChild(speedOuter);
-    // Insert under the existing HP bar (inside hudBottom)
-    hudBottom.insertBefore(wrap, hudBottom.nextSibling);
+    const dx = mouseX - lastSpeedX;
+    const dy = mouseY - lastSpeedY;
+    const d = Math.hypot(dx, dy);
+    const instant = (d / dt) * 1000; // px/s
+    // smooth up and down nicely
+    const alpha = 0.18;
+    smoothSpeed += (instant - smoothSpeed) * alpha;
+    lastSpeedT = tNow;
+    lastSpeedX = mouseX;
+    lastSpeedY = mouseY;
+    const clamped = Math.max(0, Math.min(SPEED_MAX, smoothSpeed));
+    const pct = clamped / SPEED_MAX;
+    // bar width
+    speedBarInner.style.width = `${pct * 100}%`;
+    // Yellow (60) -> Red (0)
+    const hue = 60 - pct * 60;
+    speedBarInner.style.background = `hsl(${hue}, 95%, 55%)`;
+    // text inside
+    hudSpeedText.textContent = `Speed: ${Math.round(clamped)}/${SPEED_MAX}`;
+    // die if too fast (after grace period)
+    if (joined && (tNow - joinTimeMs) > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
+        resetToMenu();
+    }
 }
 /* ========================= */
 // -------- Respawn / Reset --------
@@ -120,12 +117,8 @@ function resetToMenu() {
     myMaxHp = null;
     players.clear();
     smooth.clear();
-    // reset speed values
-    instantSpeed = 0;
-    smoothSpeed = 0;
-    lastSpeedSampleT = performance.now();
-    lastSpeedSampleX = window.innerWidth / 2;
-    lastSpeedSampleY = window.innerHeight / 2;
+    // reset speed tracking + UI
+    resetSpeedSampler();
     // UI back to menu
     hudBottom.style.display = "none";
     menu.style.display = "flex";
@@ -133,11 +126,6 @@ function resetToMenu() {
     hudName.textContent = "";
     hudHpText.textContent = "";
     hpBarInner.style.width = "0%";
-    // reset speed bar UI if it exists
-    if (speedInner)
-        speedInner.style.width = "0%";
-    if (speedText)
-        speedText.textContent = `Speed: 0/${SPEED_MAX}`;
     nameInput.value = "";
     nameInput.focus();
 }
@@ -151,12 +139,9 @@ function startGame() {
     myName = clean.length ? clean : "Player";
     mouseX = window.innerWidth / 2;
     mouseY = window.innerHeight / 2;
-    // init speed sampling baseline
-    lastSpeedSampleT = performance.now();
-    lastSpeedSampleX = mouseX;
-    lastSpeedSampleY = mouseY;
-    instantSpeed = 0;
-    smoothSpeed = 0;
+    // SPEED: initialize sampler + grace timer
+    joinTimeMs = performance.now();
+    resetSpeedSampler();
     // UI feedback immediately
     hudName.textContent = myName || "Loading...";
     hudHpText.textContent = "Connecting...";
@@ -166,8 +151,6 @@ function startGame() {
     hpBarInner.style.opacity = "1";
     menu.style.display = "none";
     hudBottom.style.display = "flex";
-    // ensure speed bar exists once HUD is shown
-    ensureSpeedBar();
     connect();
 }
 nameInput.addEventListener("keydown", (e) => {
@@ -292,27 +275,8 @@ const MOVE_SEND_MS = 50;
 window.addEventListener("pointermove", (e) => {
     mouseX = e.clientX;
     mouseY = e.clientY;
-    // --- SPEED TRACKING (NEW) ---
-    const tNow = performance.now();
-    const dtMs = tNow - lastSpeedSampleT;
-    if (dtMs > 0) {
-        const dx = mouseX - lastSpeedSampleX;
-        const dy = mouseY - lastSpeedSampleY;
-        const d = Math.hypot(dx, dy);
-        instantSpeed = (d / dtMs) * 1000; // px/s
-        // smooth up/down nicely
-        const alpha = 0.18; // lower = smoother
-        smoothSpeed += (instantSpeed - smoothSpeed) * alpha;
-        lastSpeedSampleT = tNow;
-        lastSpeedSampleX = mouseX;
-        lastSpeedSampleY = mouseY;
-        // if too fast -> die (1000 px/s fills and kills)
-        if (joined && smoothSpeed >= SPEED_MAX) {
-            resetToMenu();
-            return;
-        }
-    }
-    // --- END SPEED TRACKING ---
+    // NEW: update speed meter off the same input stream
+    updateSpeedFromMouse();
     const now = performance.now();
     if (ws && ws.readyState === WebSocket.OPEN && now - lastMoveSend >= MOVE_SEND_MS) {
         lastMoveSend = now;
@@ -391,18 +355,6 @@ function updateBottomHud() {
     hpBarInner.style.backgroundImage = "none";
     hpBarInner.style.background = `hsl(${hue}, 85%, 55%)`;
     hpBarInner.style.opacity = "1";
-    // --- SPEED BAR UI UPDATE (NEW) ---
-    ensureSpeedBar();
-    if (speedInner && speedText) {
-        const sp = Math.max(0, Math.min(SPEED_MAX, smoothSpeed));
-        const sPct = sp / SPEED_MAX;
-        speedInner.style.width = `${sPct * 100}%`;
-        // Yellow (60) -> Red (0)
-        const sHue = 60 - sPct * 60;
-        speedInner.style.background = `hsl(${sHue}, 95%, 55%)`;
-        speedText.textContent = `Speed: ${Math.round(sp).toLocaleString()}/${SPEED_MAX.toLocaleString()}`;
-    }
-    // --- END SPEED BAR ---
 }
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
