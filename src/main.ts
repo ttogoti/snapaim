@@ -74,7 +74,7 @@ function wsSend(payload: any) {
 /* =========================
    SPEED BAR CONFIG (NEW)
    ========================= */
-const SPEED_MAX = 1000; // px/s => full bar => die
+const SPEED_MAX = 2000; // px/s => full bar => die
 let lastSpeedT = performance.now();
 let lastSpeedX = mouseX;
 let lastSpeedY = mouseY;
