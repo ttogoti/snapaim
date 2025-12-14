@@ -166,7 +166,7 @@ function startGame() {
     hudBottom.style.display = "flex";
     // UI feedback immediately
     hudName.textContent = myName || "Loading...";
-    hudHpText.textContent = "Connecting...";
+    hudHpText.textContent = "Connecting/Finding a server...";
     hpBarInner.style.width = "100%";
     hpBarInner.style.backgroundImage = "none";
     hpBarInner.style.background = "hsl(120, 85%, 55%)";
@@ -275,7 +275,7 @@ function connect() {
                     const killer = players.get(from);
                     lastKillerName = (killer?.name && killer.name.trim().length) ? killer.name : from.slice(0, 4);
                 }
-                // if it killed you and server doesn�t send "dead", still show it
+                // if it killed you and server doesn t send "dead", still show it
                 if (typeof hp === "number" && hp <= 0) {
                     showDeathScreen(lastKillerName ?? "Unknown");
                 }
@@ -288,7 +288,7 @@ function connect() {
             clearInterval(heartbeat);
             heartbeat = null;
         }
-        // Don�t force menu here � death screen handles it. If it was a random disconnect, send them to menu.
+        // Don t force menu here   death screen handles it. If it was a random disconnect, send them to menu.
         if (joined && deathScreen.style.display !== "flex") {
             resetToMenu();
         }
@@ -363,7 +363,7 @@ function updateBottomHud() {
         return;
     if (!myId) {
         hudName.textContent = myName || "Loading...";
-        hudHpText.textContent = "Connecting...";
+        hudHpText.textContent = "Connecting/Finding a server...";
         return;
     }
     const me = players.get(myId);
