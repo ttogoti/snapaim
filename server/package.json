@@ -3,9 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "start": "node server.js"
   },
   "dependencies": {
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.2",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.0.0"
   }
 }

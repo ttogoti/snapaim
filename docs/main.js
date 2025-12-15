@@ -10,6 +10,11 @@ const hudHpText = document.getElementById("hudHpText");
 const hpBarInner = document.getElementById("hpBarInner");
 const speedBarInner = document.getElementById("speedBarInner");
 const hudSpeedText = document.getElementById("hudSpeedText");
+const killsBarInner = document.getElementById("killsBarInner");
+const hudKillsText = document.getElementById("hudKillsText");
+const leaderboard = document.getElementById("leaderboard");
+const leaderboardBody = document.getElementById("leaderboardBody");
+const slowdownOverlay = document.getElementById("slowdownOverlay");
 const deathScreen = document.getElementById("deathScreen");
 const deathBig = document.getElementById("deathBig");
 const continueBtn = document.getElementById("continueBtn");
@@ -64,7 +69,6 @@ let ws = null;
 let joined = false;
 let mouseX = window.innerWidth / 2;
 let mouseY = window.innerHeight / 2;
-let myMaxHp = null;
 const players = new Map();
 const smooth = new Map();
 const WS_URL = location.hostname === "localhost"
@@ -85,13 +89,20 @@ function wsSend(payload) {
     ws.send(JSON.stringify(out));
 }
 let SPEED_MAX = 2000;
-const SPEED_MAX_CAP = 3500;
 let lastSpeedT = performance.now();
 let lastSpeedX = mouseX;
 let lastSpeedY = mouseY;
 let smoothSpeed = 0;
 let joinTimeMs = performance.now();
 const SPEED_GRACE_MS = 650;
+let lastSpeedPenaltyClient = 0;
+let leaderboardData = [];
+function showSlowdown() {
+    slowdownOverlay.style.display = "block";
+    window.setTimeout(() => {
+        slowdownOverlay.style.display = "none";
+    }, 900);
+}
 function resetSpeedSampler() {
     lastSpeedT = performance.now();
     lastSpeedX = mouseX;
@@ -124,7 +135,10 @@ function updateSpeedFromMouse() {
     speedBarInner.style.background = `hsl(${hue}, 95%, 55%)`;
     hudSpeedText.textContent = `Speed: ${Math.round(clamped)}/${SPEED_MAX}`;
     if (!isDead && joined && ws && ws.readyState === WebSocket.OPEN && (tNow - joinTimeMs) > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
-        showDeathScreen("Speed");
+        if (tNow - lastSpeedPenaltyClient >= 250) {
+            lastSpeedPenaltyClient = tNow;
+            wsSend({ t: "speeding" });
+        }
     }
 }
 let lastKillerName = null;
@@ -146,6 +160,7 @@ function showDeathScreen(killedBy) {
     stopConnection();
     hideRoomText();
     hudBottom.style.display = "none";
+    leaderboard.style.display = "none";
     menu.style.display = "none";
     deathBig.textContent = killedBy;
     deathScreen.style.display = "flex";
@@ -156,17 +171,20 @@ function resetToMenu() {
     isDead = false;
     joined = false;
     myId = null;
-    myMaxHp = null;
     lastKillerName = null;
     players.clear();
     smooth.clear();
+    leaderboardData = [];
     resetSpeedSampler();
     deathScreen.style.display = "none";
+    leaderboard.style.display = "none";
     hudBottom.style.display = "none";
     menu.style.display = "flex";
     hudName.textContent = "";
     hudHpText.textContent = "";
     hpBarInner.style.width = "0%";
+    killsBarInner.style.width = "0%";
+    hudKillsText.textContent = "Kills: 0/3";
     nameInput.value = "";
     nameInput.focus();
 }
@@ -177,8 +195,8 @@ nameInput.focus();
 function startGame() {
     if (joined)
         return;
-    isDead = false;
     joined = true;
+    isDead = false;
     const clean = nameInput.value.trim().slice(0, 18);
     myName = clean.length ? clean : "Player";
     mouseX = window.innerWidth / 2;
@@ -188,12 +206,15 @@ function startGame() {
     deathScreen.style.display = "none";
     menu.style.display = "none";
     hudBottom.style.display = "flex";
+    leaderboard.style.display = "block";
     hudName.textContent = myName || "Loading...";
     hudHpText.textContent = "Connecting/Finding a server...";
     hpBarInner.style.width = "100%";
     hpBarInner.style.backgroundImage = "none";
     hpBarInner.style.background = "hsl(120, 85%, 55%)";
     hpBarInner.style.opacity = "1";
+    killsBarInner.style.width = "0%";
+    hudKillsText.textContent = "Kills: 0/3";
     showRoomText();
     setRoomTextCount(null);
     connect();
@@ -217,6 +238,18 @@ function pickRoomCount(msg, list) {
         return list.length;
     return null;
 }
+function renderLeaderboard() {
+    if (!leaderboardData.length) {
+        leaderboardBody.innerHTML = `<div class="lbRow"><div class="lbLeft">No data yet</div><div class="lbDmg">0</div></div>`;
+        return;
+    }
+    const rows = leaderboardData.slice(0, 10).map((r, i) => {
+        const nm = (r.name && r.name.trim().length) ? r.name : "Player";
+        const dmg = Math.round(r.damage).toLocaleString();
+        return `<div class="lbRow"><div class="lbLeft">${i + 1}. ${nm}</div><div class="lbDmg">${dmg}</div></div>`;
+    }).join("");
+    leaderboardBody.innerHTML = rows;
+}
 function connect() {
     ws = new WebSocket(WS_URL);
     ws.addEventListener("open", () => {
@@ -229,6 +262,10 @@ function connect() {
     ws.addEventListener("message", (ev) => {
         const msg = JSON.parse(ev.data);
         const t = msgType(msg);
+        if (t === "slowdown") {
+            showSlowdown();
+            return;
+        }
         if (t === "dead") {
             const byName = typeof msg.byName === "string" ? msg.byName : null;
             showDeathScreen(byName ?? lastKillerName ?? "Unknown");
@@ -237,12 +274,6 @@ function connect() {
         if (t === "welcome") {
             myId = typeof msg.id === "string" ? msg.id : myId;
             hitRadius = typeof msg.hitRadius === "number" ? msg.hitRadius : hitRadius;
-            if (typeof msg.maxHp === "number" && msg.maxHp > 0) {
-                myMaxHp = msg.maxHp;
-            }
-            else if (typeof msg.hp === "number" && msg.hp > 0 && myMaxHp === null) {
-                myMaxHp = msg.hp;
-            }
             const rc = pickRoomCount(msg, null);
             setRoomTextCount(rc);
             wsSend({ t: "setName", name: myName });
@@ -255,6 +286,10 @@ function connect() {
                 return;
             const rc = pickRoomCount(msg, list);
             setRoomTextCount(rc);
+            if (Array.isArray(msg.leaderboard)) {
+                leaderboardData = msg.leaderboard;
+                renderLeaderboard();
+            }
             for (const p of list) {
                 players.set(p.id, p);
                 if (p.id !== myId) {
@@ -264,17 +299,6 @@ function connect() {
                     else {
                         s.tx = p.x;
                         s.ty = p.y;
-                    }
-                }
-            }
-            if (myId) {
-                const meFromList = list.find((p) => p.id === myId);
-                if (meFromList) {
-                    if (typeof meFromList.maxHp === "number" && meFromList.maxHp > 0) {
-                        myMaxHp = meFromList.maxHp;
-                    }
-                    else if (myMaxHp === null && typeof meFromList.hp === "number" && meFromList.hp > 0) {
-                        myMaxHp = meFromList.hp;
                     }
                 }
             }
@@ -297,10 +321,15 @@ function connect() {
         if (t === "hit") {
             const to = msg.to ?? msg.target ?? msg.id;
             const hp = msg.hp ?? msg.newHp ?? msg.health;
-            if (typeof to === "string" && typeof hp === "number") {
+            const maxHp = msg.maxHp;
+            if (typeof to === "string") {
                 const target = players.get(to);
-                if (target)
-                    target.hp = hp;
+                if (target) {
+                    if (typeof hp === "number")
+                        target.hp = hp;
+                    if (typeof maxHp === "number")
+                        target.maxHp = maxHp;
+                }
             }
             if (myId && to === myId) {
                 const from = msg.from;
@@ -351,21 +380,65 @@ window.addEventListener("pointerdown", (e) => {
         return;
     wsSend({ t: "click", x: e.clientX, y: e.clientY });
 });
-function maxHpForPlayer(p) {
-    if (typeof p.maxHp === "number" && p.maxHp > 0)
-        return p.maxHp;
-    if (myMaxHp !== null && myMaxHp > 0)
-        return myMaxHp;
-    return 1;
+function drawKillLine(x, y, kills) {
+    const k = Math.max(0, Math.floor(kills));
+    const n = `${k}`;
+    const rest = " kills";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.font = "13px Ubuntu, system-ui";
+    const restW = ctx.measureText(rest).width;
+    ctx.font = "15px Ubuntu, system-ui";
+    const nW = ctx.measureText(n).width;
+    const totalW = nW + restW;
+    const left = x - totalW / 2;
+    ctx.font = "15px Ubuntu, system-ui";
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(55,55,55,0.95)";
+    ctx.strokeText(n, left + nW / 2, y);
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.fillText(n, left + nW / 2, y);
+    ctx.font = "13px Ubuntu, system-ui";
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(55,55,55,0.95)";
+    ctx.strokeText(rest, left + nW + restW / 2, y);
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.fillText(rest, left + nW + restW / 2, y);
+}
+function updateBottomHud() {
+    if (!joined)
+        return;
+    if (!myId) {
+        hudName.textContent = myName || "Loading...";
+        hudHpText.textContent = "Connecting/Finding a server...";
+        return;
+    }
+    const me = players.get(myId);
+    if (!me)
+        return;
+    const maxHp = Math.max(1, me.maxHp);
+    hudName.textContent = me.name || myName || "Player";
+    hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${Math.round(maxHp).toLocaleString()} HP`;
+    const pct = Math.max(0, Math.min(1, me.hp / maxHp));
+    hpBarInner.style.width = `${pct * 100}%`;
+    const hue = pct * 120;
+    hpBarInner.style.backgroundImage = "none";
+    hpBarInner.style.background = `hsl(${hue}, 85%, 55%)`;
+    hpBarInner.style.opacity = "1";
+    const k = Math.max(0, Math.floor(me.kills));
+    const cyc = k % 3;
+    const kpct = cyc / 3;
+    killsBarInner.style.width = `${kpct * 100}%`;
+    hudKillsText.textContent = `Kills: ${cyc}/3`;
 }
 function drawOtherHealthBar(x, y, p) {
     ctx.save();
-    const maxHp = maxHpForPlayer(p);
-    const w = 70;
+    const maxHp = Math.max(1, p.maxHp);
+    const w = 80;
     const h = 15;
     const pct = Math.max(0, Math.min(1, p.hp / maxHp));
     const bx = x - w / 2;
-    const by = y - hitRadius - 24;
+    const by = y - hitRadius - 28;
     ctx.fillStyle = "rgba(0,0,0,0.65)";
     ctx.fillRect(bx, by, w, h);
     let color;
@@ -380,7 +453,7 @@ function drawOtherHealthBar(x, y, p) {
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(55,55,55,0.95)";
     ctx.strokeRect(bx, by, w, h);
-    const text = Math.round(p.hp).toLocaleString();
+    const text = `${Math.round(p.hp).toLocaleString()}`;
     ctx.font = "9px Ubuntu, system-ui";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -390,29 +463,6 @@ function drawOtherHealthBar(x, y, p) {
     ctx.fillStyle = "rgba(255,255,255,0.95)";
     ctx.fillText(text, bx + w / 2, by + h / 2);
     ctx.restore();
-}
-function updateBottomHud() {
-    if (!joined)
-        return;
-    if (!myId) {
-        hudName.textContent = myName || "Loading...";
-        hudHpText.textContent = "Connecting/Finding a server...";
-        return;
-    }
-    const me = players.get(myId);
-    if (!me)
-        return;
-    const maxHp = (myMaxHp !== null && myMaxHp > 0) ? myMaxHp : maxHpForPlayer(me);
-    hudName.textContent = me.name || myName || "Player";
-    hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${Math.round(maxHp).toLocaleString()} HP`;
-    const pct = Math.max(0, Math.min(1, me.hp / maxHp));
-    hpBarInner.style.width = `${pct * 100}%`;
-    const hue = pct * 120;
-    hpBarInner.style.backgroundImage = "none";
-    hpBarInner.style.background = `hsl(${hue}, 85%, 55%)`;
-    hpBarInner.style.opacity = "1";
-    const shownMax = Math.round(SPEED_MAX);
-    hudSpeedText.textContent = hudSpeedText.textContent || `Speed: 0/${shownMax}`;
 }
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -441,6 +491,7 @@ function loop() {
         ctx.strokeText(label, x, y + hitRadius + 14);
         ctx.fillStyle = "rgba(255,255,255,0.92)";
         ctx.fillText(label, x, y + hitRadius + 14);
+        drawKillLine(x, y + hitRadius + 30, p.kills);
         ctx.restore();
         drawOtherHealthBar(x, y, p);
     }

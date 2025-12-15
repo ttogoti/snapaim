@@ -1,154 +1,201 @@
+import http from "http";
+import { randomBytes } from "crypto";
 import { WebSocketServer } from "ws";
-import { randomUUID } from "crypto";
-
 const PORT = Number(process.env.PORT || 8080);
-
-const START_HP = 10000;
-const HIT_RADIUS = 22;
-const HISTORY_MS = 250;
-const SPEED_WINDOW_MS = 120;
-
-const MAX_DAMAGE = 100000;
-
-// if we haven't heard from a client in this long, kick them
-const STALE_MS = 8000;
-
-const players = new Map();
-
-function now() { return Date.now(); }
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-
-function pruneHistory(p, t) {
-  const cutoff = t - HISTORY_MS;
-  while (p.history.length && p.history[0].t < cutoff) p.history.shift();
-}
-
-function speedPxPerSec(p, tEnd) {
-  const tStart = tEnd - SPEED_WINDOW_MS;
-  let first = null, last = null;
-
-  for (const s of p.history) {
-    if (s.t >= tStart && !first) first = s;
-    if (s.t <= tEnd) last = s;
-  }
-  if (!first || !last || last.t === first.t) return 0;
-
-  const d = dist(first.p, last.p);
-  const dt = (last.t - first.t) / 1000;
-  return dt > 0 ? d / dt : 0;
-}
-
-function broadcast(obj) {
-  const msg = JSON.stringify(obj);
-  for (const p of players.values()) {
-    if (p.ws.readyState === 1) p.ws.send(msg);
-  }
-}
-
-function snapshot() {
-  return Array.from(players.values()).map(p => ({
-    id: p.id,
-    name: p.name,
-    x: p.pos.x,
-    y: p.pos.y,
-    hp: p.hp
-  }));
-}
-
-const wss = new WebSocketServer({ port: PORT });
-
-wss.on("connection", (ws) => {
-  const id = randomUUID();
-  const t = now();
-
-  const p = {
-    id,
-    ws,
-    name: "Player",
-    pos: { x: 0, y: 0 },
-    hp: START_HP,
-    history: [{ t, p: { x: 0, y: 0 } }],
-    lastSeen: t
-  };
-
-  players.set(id, p);
-
-  ws.send(JSON.stringify({ t: "welcome", id, hp: START_HP, hitRadius: HIT_RADIUS }));
-  broadcast({ t: "state", players: snapshot() });
-
-  ws.on("message", (raw) => {
-    let msg;
-    try { msg = JSON.parse(raw.toString("utf8")); } catch { return; }
-
-    const tNow = now();
-    p.lastSeen = tNow;
-
-    if (msg.t === "setName") {
-      if (typeof msg.name !== "string") return;
-      const clean = msg.name.trim().slice(0, 18);
-      p.name = clean.length ? clean : "Player";
-      broadcast({ t: "state", players: snapshot() });
-      return;
-    }
-
-    if (msg.t === "move") {
-      if (typeof msg.x !== "number" || typeof msg.y !== "number") return;
-      p.pos = { x: msg.x, y: msg.y };
-      p.history.push({ t: tNow, p: { x: msg.x, y: msg.y } });
-      pruneHistory(p, tNow);
-      return;
-    }
-
-    if (msg.t === "click") {
-      const spd = speedPxPerSec(p, tNow);
-      let dmg = Math.round(spd);
-      dmg = clamp(dmg, 0, MAX_DAMAGE);
-
-      const clickPos = (typeof msg.x === "number" && typeof msg.y === "number")
-        ? { x: msg.x, y: msg.y }
-        : p.pos;
-
-      let target = null;
-      let best = Infinity;
-
-      for (const other of players.values()) {
-        if (other.id === p.id || other.hp <= 0) continue;
-        const d = dist(other.pos, clickPos);
-        if (d <= HIT_RADIUS && d < best) {
-          best = d;
-          target = other;
-        }
-      }
-      if (!target) return;
-
-      target.hp = Math.max(0, target.hp - dmg);
-
-      broadcast({ t: "hit", from: p.id, to: target.id, dmg, hp: target.hp });
-    }
-  });
-
-  ws.on("close", () => {
-    players.delete(id);
-    broadcast({ t: "state", players: snapshot() });
-  });
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { "content-type": "text/plain" });
+    res.end("ok");
 });
-
-// state updates
-setInterval(() => broadcast({ t: "state", players: snapshot() }), 1000 / 30);
-
-// stale cleanup
-setInterval(() => {
-  const t = now();
-  let changed = false;
-  for (const [id, p] of players) {
-    if (t - p.lastSeen > STALE_MS) {
-      try { p.ws.terminate?.(); } catch {}
-      players.delete(id);
-      changed = true;
+const wss = new WebSocketServer({ server });
+const players = new Map();
+const sockets = new Map();
+const HIT_RADIUS = 22;
+const SPEED_MAX = 2000;
+const SPEED_PENALTY_DMG = 4999;
+const SPEED_PENALTY_COOLDOWN_MS = 2000;
+const MAXHP_STEP = 5000;
+function now() {
+    return Date.now();
+}
+function id4(id) {
+    return id.slice(0, 4);
+}
+function safeName(n) {
+    const s = typeof n === "string" ? n.trim() : "";
+    const c = s.slice(0, 18);
+    return c.length ? c : "Player";
+}
+function send(ws, obj) {
+    if (ws.readyState !== 1)
+        return;
+    ws.send(JSON.stringify(obj));
+}
+function broadcast(obj) {
+    const msg = JSON.stringify(obj);
+    for (const client of wss.clients) {
+        if (client.readyState === 1)
+            client.send(msg);
     }
-  }
-  if (changed) broadcast({ t: "state", players: snapshot() });
-}, 1000);
-
-console.log(`Server running on ws://localhost:${PORT}`);
+}
+function leaderboardTop10() {
+    const arr = Array.from(players.values()).map((p) => ({
+        name: (p.name && p.name.trim().length) ? p.name : id4(p.id),
+        damage: p.damage
+    }));
+    arr.sort((a, b) => b.damage - a.damage);
+    return arr.slice(0, 10);
+}
+function applyDamage(attacker, target, dmg) {
+    const before = target.hp;
+    const applied = Math.max(0, Math.min(before, Math.floor(dmg)));
+    if (applied <= 0)
+        return false;
+    target.hp = Math.max(0, before - applied);
+    attacker.damage += applied;
+    broadcast({ t: "hit", from: attacker.id, to: target.id, hp: target.hp, maxHp: target.maxHp });
+    if (target.hp <= 0) {
+        attacker.kills += 1;
+        if (attacker.kills % 3 === 0) {
+            const pct = attacker.maxHp > 0 ? attacker.hp / attacker.maxHp : 1;
+            attacker.maxHp += MAXHP_STEP;
+            attacker.hp = Math.max(1, Math.round(pct * attacker.maxHp));
+            broadcast({ t: "hit", from: attacker.id, to: attacker.id, hp: attacker.hp, maxHp: attacker.maxHp });
+        }
+        const byName = (attacker.name && attacker.name.trim().length) ? attacker.name : id4(attacker.id);
+        for (const [sock, pid] of sockets.entries()) {
+            if (pid === target.id) {
+                send(sock, { t: "dead", byName });
+                break;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+function getPlayerFromWs(ws) {
+    const id = sockets.get(ws);
+    if (!id)
+        return null;
+    return players.get(id) || null;
+}
+wss.on("connection", (ws) => {
+    const id = randomBytes(8).toString("hex");
+    const t = now();
+    const p = {
+        id,
+        name: id4(id),
+        x: 0,
+        y: 0,
+        hp: 10000,
+        maxHp: 10000,
+        kills: 0,
+        damage: 0,
+        lastMoveT: t,
+        lastMoveX: 0,
+        lastMoveY: 0,
+        speed: 0,
+        lastSpeedPenaltyT: 0
+    };
+    players.set(id, p);
+    sockets.set(ws, id);
+    send(ws, { t: "welcome", id, hitRadius: HIT_RADIUS, speedMax: SPEED_MAX, roomCount: players.size });
+    ws.on("message", (buf) => {
+        let msg;
+        try {
+            msg = JSON.parse(String(buf));
+        }
+        catch {
+            return;
+        }
+        const type = msg?.t ?? msg?.type;
+        const me = getPlayerFromWs(ws);
+        if (!me)
+            return;
+        if (type === "setName") {
+            me.name = safeName(msg?.name);
+            return;
+        }
+        if (type === "move") {
+            const x = Number(msg?.x);
+            const y = Number(msg?.y);
+            if (!isFinite(x) || !isFinite(y))
+                return;
+            const tNow = now();
+            const dt = Math.max(1, tNow - me.lastMoveT);
+            const dx = x - me.lastMoveX;
+            const dy = y - me.lastMoveY;
+            const dist = Math.hypot(dx, dy);
+            me.speed = (dist / dt) * 1000;
+            me.lastMoveT = tNow;
+            me.lastMoveX = x;
+            me.lastMoveY = y;
+            me.x = x;
+            me.y = y;
+            return;
+        }
+        if (type === "speeding") {
+            const tNow = now();
+            if (tNow - me.lastSpeedPenaltyT < SPEED_PENALTY_COOLDOWN_MS)
+                return;
+            me.lastSpeedPenaltyT = tNow;
+            me.hp = Math.max(0, me.hp - SPEED_PENALTY_DMG);
+            send(ws, { t: "slowdown" });
+            broadcast({ t: "hit", from: "speed", to: me.id, hp: me.hp, maxHp: me.maxHp });
+            if (me.hp <= 0) {
+                send(ws, { t: "dead", byName: "Speed" });
+            }
+            return;
+        }
+        if (type === "click") {
+            const x = Number(msg?.x);
+            const y = Number(msg?.y);
+            if (!isFinite(x) || !isFinite(y))
+                return;
+            let best = null;
+            let bestD = Infinity;
+            for (const other of players.values()) {
+                if (other.id === me.id)
+                    continue;
+                if (other.hp <= 0)
+                    continue;
+                const d = Math.hypot(other.x - x, other.y - y);
+                if (d <= HIT_RADIUS && d < bestD) {
+                    bestD = d;
+                    best = other;
+                }
+            }
+            if (!best)
+                return;
+            const dmg = Math.max(1, Math.floor(Math.min(me.speed, 3500)));
+            applyDamage(me, best, dmg);
+            return;
+        }
+    });
+    ws.on("close", () => {
+        const pid = sockets.get(ws);
+        if (pid) {
+            players.delete(pid);
+            sockets.delete(ws);
+        }
+    });
+    ws.on("error", () => { });
+});
+setInterval(() => {
+    const list = Array.from(players.values()).map((p) => ({
+        id: p.id,
+        name: p.name,
+        x: p.x,
+        y: p.y,
+        hp: p.hp,
+        maxHp: p.maxHp,
+        kills: p.kills,
+        damage: p.damage
+    }));
+    broadcast({
+        t: "state",
+        roomCount: players.size,
+        players: list,
+        leaderboard: leaderboardTop10()
+    });
+}, 50);
+server.listen(PORT);
