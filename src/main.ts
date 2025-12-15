@@ -32,9 +32,22 @@ function ensureRoomText() {
    d.style.color = "rgba(0,0,0,0.75)";
    d.style.zIndex = "9999";
    d.style.pointerEvents = "none";
-   d.textContent = "Connecting...";
+   d.style.display = "none";
+   d.textContent = "";
    document.body.appendChild(d);
    roomText = d;
+}
+
+function showRoomText() {
+   ensureRoomText();
+   if (roomText) roomText.style.display = "block";
+}
+
+function hideRoomText() {
+   if (roomText) {
+      roomText.style.display = "none";
+      roomText.textContent = "";
+   }
 }
 
 function setRoomTextCount(count: number | null) {
@@ -168,6 +181,8 @@ function stopConnection() {
 function showDeathScreen(killedBy: string) {
    stopConnection();
 
+   hideRoomText();
+
    hudBottom.style.display = "none";
    menu.style.display = "none";
 
@@ -177,6 +192,8 @@ function showDeathScreen(killedBy: string) {
 
 function resetToMenu() {
    stopConnection();
+
+   hideRoomText();
 
    joined = false;
    myId = null;
@@ -194,8 +211,6 @@ function resetToMenu() {
    hudName.textContent = "";
    hudHpText.textContent = "";
    hpBarInner.style.width = "0%";
-
-   setRoomTextCount(null);
 
    nameInput.value = "";
    nameInput.focus();
@@ -231,6 +246,7 @@ function startGame() {
    hpBarInner.style.background = "hsl(120, 85%, 55%)";
    hpBarInner.style.opacity = "1";
 
+   showRoomText();
    setRoomTextCount(null);
 
    connect();
@@ -532,5 +548,5 @@ function loop() {
    requestAnimationFrame(loop);
 }
 
-setRoomTextCount(null);
+hideRoomText();
 loop();

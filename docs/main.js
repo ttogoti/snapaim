@@ -28,9 +28,21 @@ function ensureRoomText() {
     d.style.color = "rgba(0,0,0,0.75)";
     d.style.zIndex = "9999";
     d.style.pointerEvents = "none";
-    d.textContent = "Connecting...";
+    d.style.display = "none";
+    d.textContent = "";
     document.body.appendChild(d);
     roomText = d;
+}
+function showRoomText() {
+    ensureRoomText();
+    if (roomText)
+        roomText.style.display = "block";
+}
+function hideRoomText() {
+    if (roomText) {
+        roomText.style.display = "none";
+        roomText.textContent = "";
+    }
 }
 function setRoomTextCount(count) {
     ensureRoomText();
@@ -128,6 +140,7 @@ function stopConnection() {
 }
 function showDeathScreen(killedBy) {
     stopConnection();
+    hideRoomText();
     hudBottom.style.display = "none";
     menu.style.display = "none";
     deathBig.textContent = killedBy;
@@ -135,6 +148,7 @@ function showDeathScreen(killedBy) {
 }
 function resetToMenu() {
     stopConnection();
+    hideRoomText();
     joined = false;
     myId = null;
     myMaxHp = null;
@@ -148,7 +162,6 @@ function resetToMenu() {
     hudName.textContent = "";
     hudHpText.textContent = "";
     hpBarInner.style.width = "0%";
-    setRoomTextCount(null);
     nameInput.value = "";
     nameInput.focus();
 }
@@ -175,6 +188,7 @@ function startGame() {
     hpBarInner.style.backgroundImage = "none";
     hpBarInner.style.background = "hsl(120, 85%, 55%)";
     hpBarInner.style.opacity = "1";
+    showRoomText();
     setRoomTextCount(null);
     connect();
 }
@@ -430,5 +444,5 @@ function loop() {
     updateBottomHud();
     requestAnimationFrame(loop);
 }
-setRoomTextCount(null);
+hideRoomText();
 loop();
