@@ -5,19 +5,12 @@ const menu = document.getElementById("menu");
 const nameInput = document.getElementById("nameInput");
 const playBtn = document.getElementById("playBtn");
 const hudBottom = document.getElementById("hudBottom");
-const hudName = document.getElementById("hudName");
-const hudHpText = document.getElementById("hudHpText");
-const hpBarInner = document.getElementById("hpBarInner");
-const speedBarInner = document.getElementById("speedBarInner");
-const hudSpeedText = document.getElementById("hudSpeedText");
 const killsBarInner = document.getElementById("killsBarInner");
-const hudKillsText = document.getElementById("hudKillsText");
-const leaderboard = document.getElementById("leaderboard");
-const leaderboardBody = document.getElementById("leaderboardBody");
-const slowdownOverlay = document.getElementById("slowdownOverlay");
 const deathScreen = document.getElementById("deathScreen");
 const deathBig = document.getElementById("deathBig");
 const continueBtn = document.getElementById("continueBtn");
+const leaderboard = document.getElementById("leaderboard");
+const leaderboardBody = document.getElementById("leaderboardBody");
 let roomText = document.getElementById("roomText");
 function ensureRoomText() {
     if (roomText)
@@ -69,6 +62,7 @@ let ws = null;
 let joined = false;
 let mouseX = window.innerWidth / 2;
 let mouseY = window.innerHeight / 2;
+let myMaxHp = null;
 const players = new Map();
 const smooth = new Map();
 const WS_URL = location.hostname === "localhost"
@@ -89,30 +83,21 @@ function wsSend(payload) {
     ws.send(JSON.stringify(out));
 }
 let SPEED_MAX = 2000;
+const SPEED_MAX_CAP = 3500;
 let lastSpeedT = performance.now();
 let lastSpeedX = mouseX;
 let lastSpeedY = mouseY;
 let smoothSpeed = 0;
 let joinTimeMs = performance.now();
 const SPEED_GRACE_MS = 650;
-let lastSpeedPenaltyClient = 0;
-let leaderboardData = [];
-function showSlowdown() {
-    slowdownOverlay.style.display = "block";
-    window.setTimeout(() => {
-        slowdownOverlay.style.display = "none";
-    }, 900);
-}
+let lastSpeedingSend = 0;
+const SPEEDING_SEND_MS = 120;
 function resetSpeedSampler() {
     lastSpeedT = performance.now();
     lastSpeedX = mouseX;
     lastSpeedY = mouseY;
     smoothSpeed = 0;
-    speedBarInner.style.width = "0%";
-    speedBarInner.style.backgroundImage = "none";
-    speedBarInner.style.background = "hsl(60, 95%, 55%)";
-    speedBarInner.style.opacity = "1";
-    hudSpeedText.textContent = `Speed: 0/${SPEED_MAX}`;
+    lastSpeedingSend = 0;
 }
 function updateSpeedFromMouse() {
     const tNow = performance.now();
@@ -128,17 +113,18 @@ function updateSpeedFromMouse() {
     lastSpeedT = tNow;
     lastSpeedX = mouseX;
     lastSpeedY = mouseY;
-    const clamped = Math.max(0, Math.min(SPEED_MAX, smoothSpeed));
-    const pct = SPEED_MAX > 0 ? clamped / SPEED_MAX : 0;
-    speedBarInner.style.width = `${pct * 100}%`;
-    const hue = 60 - pct * 60;
-    speedBarInner.style.background = `hsl(${hue}, 95%, 55%)`;
-    hudSpeedText.textContent = `Speed: ${Math.round(clamped)}/${SPEED_MAX}`;
-    if (!isDead && joined && ws && ws.readyState === WebSocket.OPEN && (tNow - joinTimeMs) > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
-        if (tNow - lastSpeedPenaltyClient >= 250) {
-            lastSpeedPenaltyClient = tNow;
-            wsSend({ t: "speeding" });
-        }
+    if (!joined || isDead)
+        return;
+    if ((tNow - joinTimeMs) <= SPEED_GRACE_MS)
+        return;
+    if (smoothSpeed >= SPEED_MAX) {
+        const now = performance.now();
+        if (!ws || ws.readyState !== WebSocket.OPEN)
+            return;
+        if (now - lastSpeedingSend < SPEEDING_SEND_MS)
+            return;
+        lastSpeedingSend = now;
+        wsSend({ t: "speeding" });
     }
 }
 let lastKillerName = null;
@@ -171,20 +157,16 @@ function resetToMenu() {
     isDead = false;
     joined = false;
     myId = null;
+    myMaxHp = null;
     lastKillerName = null;
     players.clear();
     smooth.clear();
-    leaderboardData = [];
     resetSpeedSampler();
     deathScreen.style.display = "none";
-    leaderboard.style.display = "none";
     hudBottom.style.display = "none";
+    leaderboard.style.display = "none";
     menu.style.display = "flex";
-    hudName.textContent = "";
-    hudHpText.textContent = "";
-    hpBarInner.style.width = "0%";
     killsBarInner.style.width = "0%";
-    hudKillsText.textContent = "Kills: 0/3";
     nameInput.value = "";
     nameInput.focus();
 }
@@ -196,7 +178,6 @@ function startGame() {
     if (joined)
         return;
     joined = true;
-    isDead = false;
     const clean = nameInput.value.trim().slice(0, 18);
     myName = clean.length ? clean : "Player";
     mouseX = window.innerWidth / 2;
@@ -207,14 +188,6 @@ function startGame() {
     menu.style.display = "none";
     hudBottom.style.display = "flex";
     leaderboard.style.display = "block";
-    hudName.textContent = myName || "Loading...";
-    hudHpText.textContent = "Connecting/Finding a server...";
-    hpBarInner.style.width = "100%";
-    hpBarInner.style.backgroundImage = "none";
-    hpBarInner.style.background = "hsl(120, 85%, 55%)";
-    hpBarInner.style.opacity = "1";
-    killsBarInner.style.width = "0%";
-    hudKillsText.textContent = "Kills: 0/3";
     showRoomText();
     setRoomTextCount(null);
     connect();
@@ -238,17 +211,26 @@ function pickRoomCount(msg, list) {
         return list.length;
     return null;
 }
-function renderLeaderboard() {
-    if (!leaderboardData.length) {
-        leaderboardBody.innerHTML = `<div class="lbRow"><div class="lbLeft">No data yet</div><div class="lbDmg">0</div></div>`;
+function setLeaderboard(rows) {
+    if (!rows || !Array.isArray(rows)) {
+        leaderboardBody.innerHTML = "";
         return;
     }
-    const rows = leaderboardData.slice(0, 10).map((r, i) => {
-        const nm = (r.name && r.name.trim().length) ? r.name : "Player";
-        const dmg = Math.round(r.damage).toLocaleString();
-        return `<div class="lbRow"><div class="lbLeft">${i + 1}. ${nm}</div><div class="lbDmg">${dmg}</div></div>`;
-    }).join("");
-    leaderboardBody.innerHTML = rows;
+    leaderboardBody.innerHTML = "";
+    for (let i = 0; i < Math.min(10, rows.length); i++) {
+        const r = rows[i];
+        const row = document.createElement("div");
+        row.className = "lbRow";
+        const left = document.createElement("div");
+        left.className = "lbName";
+        left.textContent = `${i + 1}. ${String(r?.name ?? "Player")}`;
+        const right = document.createElement("div");
+        right.className = "lbDmg";
+        right.textContent = `${Math.round(Number(r?.damage ?? 0)).toLocaleString()}`;
+        row.appendChild(left);
+        row.appendChild(right);
+        leaderboardBody.appendChild(row);
+    }
 }
 function connect() {
     ws = new WebSocket(WS_URL);
@@ -262,10 +244,6 @@ function connect() {
     ws.addEventListener("message", (ev) => {
         const msg = JSON.parse(ev.data);
         const t = msgType(msg);
-        if (t === "slowdown") {
-            showSlowdown();
-            return;
-        }
         if (t === "dead") {
             const byName = typeof msg.byName === "string" ? msg.byName : null;
             showDeathScreen(byName ?? lastKillerName ?? "Unknown");
@@ -274,6 +252,14 @@ function connect() {
         if (t === "welcome") {
             myId = typeof msg.id === "string" ? msg.id : myId;
             hitRadius = typeof msg.hitRadius === "number" ? msg.hitRadius : hitRadius;
+            if (typeof msg.speedMax === "number" && msg.speedMax > 0)
+                SPEED_MAX = msg.speedMax;
+            if (typeof msg.maxHp === "number" && msg.maxHp > 0) {
+                myMaxHp = msg.maxHp;
+            }
+            else if (typeof msg.hp === "number" && msg.hp > 0 && myMaxHp === null) {
+                myMaxHp = msg.hp;
+            }
             const rc = pickRoomCount(msg, null);
             setRoomTextCount(rc);
             wsSend({ t: "setName", name: myName });
@@ -286,10 +272,8 @@ function connect() {
                 return;
             const rc = pickRoomCount(msg, list);
             setRoomTextCount(rc);
-            if (Array.isArray(msg.leaderboard)) {
-                leaderboardData = msg.leaderboard;
-                renderLeaderboard();
-            }
+            const lb = msg.leaderboard;
+            setLeaderboard(Array.isArray(lb) ? lb : null);
             for (const p of list) {
                 players.set(p.id, p);
                 if (p.id !== myId) {
@@ -299,6 +283,17 @@ function connect() {
                     else {
                         s.tx = p.x;
                         s.ty = p.y;
+                    }
+                }
+            }
+            if (myId) {
+                const meFromList = list.find((p) => p.id === myId);
+                if (meFromList) {
+                    if (typeof meFromList.maxHp === "number" && meFromList.maxHp > 0) {
+                        myMaxHp = meFromList.maxHp;
+                    }
+                    else if (myMaxHp === null && typeof meFromList.hp === "number" && meFromList.hp > 0) {
+                        myMaxHp = meFromList.hp;
                     }
                 }
             }
@@ -321,13 +316,13 @@ function connect() {
         if (t === "hit") {
             const to = msg.to ?? msg.target ?? msg.id;
             const hp = msg.hp ?? msg.newHp ?? msg.health;
-            const maxHp = msg.maxHp;
+            const maxHp = msg.maxHp ?? msg.maxHealth;
             if (typeof to === "string") {
                 const target = players.get(to);
                 if (target) {
                     if (typeof hp === "number")
                         target.hp = hp;
-                    if (typeof maxHp === "number")
+                    if (typeof maxHp === "number" && maxHp > 0)
                         target.maxHp = maxHp;
                 }
             }
@@ -380,89 +375,139 @@ window.addEventListener("pointerdown", (e) => {
         return;
     wsSend({ t: "click", x: e.clientX, y: e.clientY });
 });
-function drawKillLine(x, y, kills) {
-    const k = Math.max(0, Math.floor(kills));
-    const n = `${k}`;
-    const rest = " kills";
+function maxHpForPlayer(p) {
+    if (typeof p.maxHp === "number" && p.maxHp > 0)
+        return p.maxHp;
+    if (myMaxHp !== null && myMaxHp > 0)
+        return myMaxHp;
+    return 1;
+}
+function roundedRect(x, y, w, h, r) {
+    const rr = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+}
+function hpHueBlueYellowRed(pct) {
+    const t = Math.max(0, Math.min(1, pct));
+    if (t >= 0.5) {
+        const u = (t - 0.5) / 0.5;
+        return 60 + (200 - 60) * u;
+    }
+    else {
+        const u = t / 0.5;
+        return 0 + (60 - 0) * u;
+    }
+}
+function drawHpBarAbove(x, y, p, isSelf) {
+    const maxHp = maxHpForPlayer(p);
+    const pct = Math.max(0, Math.min(1, p.hp / maxHp));
+    const w = 70;
+    const h = 12;
+    const bx = x - w / 2;
+    const by = y - hitRadius - 24;
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.20)";
+    roundedRect(bx, by, w, h, 6);
+    ctx.fill();
+    let hue = 120;
+    if (isSelf) {
+        hue = hpHueBlueYellowRed(pct);
+        ctx.fillStyle = `hsl(${hue}, 95%, 55%)`;
+    }
+    else {
+        let c = "#3ddc84";
+        if (pct > 0.6)
+            c = "#3ddc84";
+        else if (pct > 0.3)
+            c = "#f5c542";
+        else
+            c = "#ff4d4d";
+        ctx.fillStyle = c;
+    }
+    const fw = w * pct;
+    if (fw > 0) {
+        roundedRect(bx, by, fw, h, 6);
+        ctx.fill();
+    }
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(55,55,55,0.95)";
+    roundedRect(bx, by, w, h, 6);
+    ctx.stroke();
+    ctx.restore();
+}
+function drawOtherLabel(x, y, p) {
+    const name = (p.name && p.name.trim().length) ? p.name : p.id.slice(0, 4);
+    const kills = typeof p.kills === "number" ? p.kills : 0;
+    const baseY = y + hitRadius + 14;
+    ctx.save();
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    ctx.font = "13px Ubuntu, system-ui";
-    const restW = ctx.measureText(rest).width;
-    ctx.font = "15px Ubuntu, system-ui";
-    const nW = ctx.measureText(n).width;
-    const totalW = nW + restW;
-    const left = x - totalW / 2;
-    ctx.font = "15px Ubuntu, system-ui";
-    ctx.lineWidth = 4;
+    ctx.font = "12px Ubuntu, system-ui";
+    ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(55,55,55,0.95)";
-    ctx.strokeText(n, left + nW / 2, y);
-    ctx.fillStyle = "rgba(255,255,255,0.95)";
-    ctx.fillText(n, left + nW / 2, y);
-    ctx.font = "13px Ubuntu, system-ui";
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "rgba(55,55,55,0.95)";
-    ctx.strokeText(rest, left + nW + restW / 2, y);
+    ctx.strokeText(name, x, baseY);
     ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.fillText(rest, left + nW + restW / 2, y);
+    ctx.fillText(name, x, baseY);
+    const line2Y = baseY + 14;
+    const numText = `${kills}`;
+    const suffix = " kills";
+    ctx.font = "800 12px Ubuntu, system-ui";
+    const numW = ctx.measureText(numText).width;
+    ctx.font = "12px Ubuntu, system-ui";
+    const sufW = ctx.measureText(suffix).width;
+    const totalW = numW + sufW;
+    const startX = x - totalW / 2;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(55,55,55,0.95)";
+    ctx.font = "800 12px Ubuntu, system-ui";
+    ctx.strokeText(numText, startX + numW / 2, line2Y);
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.fillText(numText, startX + numW / 2, line2Y);
+    ctx.font = "12px Ubuntu, system-ui";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(55,55,55,0.95)";
+    ctx.strokeText(suffix, startX + numW + sufW / 2, line2Y);
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.fillText(suffix, startX + numW + sufW / 2, line2Y);
+    ctx.restore();
 }
-function updateBottomHud() {
-    if (!joined)
-        return;
-    if (!myId) {
-        hudName.textContent = myName || "Loading...";
-        hudHpText.textContent = "Connecting/Finding a server...";
+function updateKillsBar() {
+    if (!joined || !myId) {
+        killsBarInner.style.width = "0%";
+        killsBarInner.style.background = "#7c7c7c";
         return;
     }
     const me = players.get(myId);
     if (!me)
         return;
-    const maxHp = Math.max(1, me.maxHp);
-    hudName.textContent = me.name || myName || "Player";
-    hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${Math.round(maxHp).toLocaleString()} HP`;
-    const pct = Math.max(0, Math.min(1, me.hp / maxHp));
-    hpBarInner.style.width = `${pct * 100}%`;
-    const hue = pct * 120;
-    hpBarInner.style.backgroundImage = "none";
-    hpBarInner.style.background = `hsl(${hue}, 85%, 55%)`;
-    hpBarInner.style.opacity = "1";
-    const k = Math.max(0, Math.floor(me.kills));
-    const cyc = k % 3;
-    const kpct = cyc / 3;
-    killsBarInner.style.width = `${kpct * 100}%`;
-    hudKillsText.textContent = `Kills: ${cyc}/3`;
+    const k = typeof me.kills === "number" ? me.kills : 0;
+    const mod = ((k % 3) + 3) % 3;
+    const pct = mod / 3;
+    killsBarInner.style.width = `${pct * 100}%`;
+    killsBarInner.style.background = "linear-gradient(to bottom, #7fb6ff 0%, #7fb6ff 66.666%, #2f76ff 66.666%, #2f76ff 100%)";
+    killsBarInner.style.borderRadius = "10px";
 }
-function drawOtherHealthBar(x, y, p) {
+function drawSelf() {
+    if (!joined || isDead)
+        return;
+    const speedPct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
+    const hue = 240 - speedPct * 240;
     ctx.save();
-    const maxHp = Math.max(1, p.maxHp);
-    const w = 80;
-    const h = 15;
-    const pct = Math.max(0, Math.min(1, p.hp / maxHp));
-    const bx = x - w / 2;
-    const by = y - hitRadius - 28;
-    ctx.fillStyle = "rgba(0,0,0,0.65)";
-    ctx.fillRect(bx, by, w, h);
-    let color;
-    if (pct > 0.6)
-        color = "#3ddc84";
-    else if (pct > 0.3)
-        color = "#f5c542";
-    else
-        color = "#ff4d4d";
-    ctx.fillStyle = color;
-    ctx.fillRect(bx, by, w * pct, h);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(55,55,55,0.95)";
-    ctx.strokeRect(bx, by, w, h);
-    const text = `${Math.round(p.hp).toLocaleString()}`;
-    ctx.font = "9px Ubuntu, system-ui";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "rgba(55,55,55,0.95)";
-    ctx.strokeText(text, bx + w / 2, by + h / 2);
-    ctx.fillStyle = "rgba(255,255,255,0.95)";
-    ctx.fillText(text, bx + w / 2, by + h / 2);
+    ctx.beginPath();
+    ctx.arc(mouseX, mouseY, hitRadius, 0, Math.PI * 2);
+    ctx.fillStyle = `hsl(${hue}, 95%, 55%)`;
+    ctx.fill();
     ctx.restore();
+    if (myId) {
+        const me = players.get(myId);
+        if (me)
+            drawHpBarAbove(mouseX, mouseY, me, true);
+    }
 }
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -482,20 +527,12 @@ function loop() {
         ctx.arc(x, y, hitRadius, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(90,240,150,0.95)";
         ctx.fill();
-        const label = (p.name && p.name.trim().length) ? p.name : p.id.slice(0, 4);
-        ctx.font = "12px Ubuntu, system-ui";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "alphabetic";
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = "rgba(55,55,55,0.95)";
-        ctx.strokeText(label, x, y + hitRadius + 14);
-        ctx.fillStyle = "rgba(255,255,255,0.92)";
-        ctx.fillText(label, x, y + hitRadius + 14);
-        drawKillLine(x, y + hitRadius + 30, p.kills);
         ctx.restore();
-        drawOtherHealthBar(x, y, p);
+        drawHpBarAbove(x, y, p, false);
+        drawOtherLabel(x, y, p);
     }
-    updateBottomHud();
+    drawSelf();
+    updateKillsBar();
     requestAnimationFrame(loop);
 }
 hideRoomText();

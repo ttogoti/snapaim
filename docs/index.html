@@ -170,7 +170,7 @@
     #hudBottom {
       position: fixed;
       left: 50%;
-      bottom: 28px;
+      bottom: 22px;
       transform: translateX(-50%);
       width: min(860px, calc(100vw - 48px));
       display: none;
@@ -181,66 +181,25 @@
       z-index: 3;
     }
 
-    #hudName {
-      width: 100%;
-      text-align: center;
-      font-weight: 800;
-      font-size: 18px;
-      color: rgba(0,0,0,0.85);
-    }
-
-    #hpBarOuter, #speedBarOuter, #killsBarOuter {
+    .barOuter {
       position: relative;
       width: 100%;
-      height: 18px;
-      border-radius: 999px;
+      height: 16px;
+      border-radius: 10px;
       overflow: hidden;
-      background: rgba(0,0,0,0.08);
-    }
-
-    #hpBarOuter::after, #speedBarOuter::after, #killsBarOuter::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: 999px;
-      border: 1px solid rgba(0,0,0,0.12);
+      background: rgba(0,0,0,0.10);
+      border: 2px solid rgba(0,0,0,0.20);
       box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.75),
+        inset 0 1px 0 rgba(255,255,255,0.70),
         inset 0 -1px 0 rgba(0,0,0,0.18),
-        inset 0 -3px 0 rgba(0,0,0,0.22);
-      z-index: 2;
-      pointer-events: none;
+        inset 0 -3px 0 rgba(0,0,0,0.20);
     }
 
-    #hpBarInner, #speedBarInner, #killsBarInner {
-      position: absolute;
-      left: 0;
-      top: 0;
+    .barInner {
       height: 100%;
-      border-radius: 999px;
-      z-index: 1;
-    }
-
-    #hpBarInner { width: 100%; background: hsl(120, 85%, 55%); }
-    #speedBarInner { width: 0%; background: hsl(60, 95%, 55%); }
-    #killsBarInner { width: 0%; background: linear-gradient(to bottom,#7fb6ff 0%,#7fb6ff 66.666%,#2f76ff 66.666%,#2f76ff 100%); }
-
-    #hudHpText, #hudSpeedText, #hudKillsText {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 800;
-      font-size: 14px;
-      letter-spacing: 0.2px;
-      color: rgba(0,0,0,0.92);
-      text-shadow:
-        0 1px 0 rgba(255,255,255,0.6),
-        0 -1px 0 rgba(0,0,0,0.25);
-      user-select: none;
-      z-index: 3;
-      pointer-events: none;
+      width: 0%;
+      border-radius: 10px;
+      background: #7c7c7c;
     }
 
     #deathScreen, #tutorialScreen, #socialsScreen {
@@ -337,7 +296,13 @@
       justify-content: center;
       font-size: 18px;
       font-weight: 900;
-      background: linear-gradient(to bottom,#cfcfcf 0%,#cfcfcf 66.666%,#8c8c8c 66.666%,#8c8c8c 100%);
+      background: linear-gradient(
+        to bottom,
+        #cfcfcf 0%,
+        #cfcfcf 66.666%,
+        #8c8c8c 66.666%,
+        #8c8c8c 100%
+      );
       box-shadow:
         inset 0 1px 0 var(--bevelTop),
         inset 0 -1px 0 var(--bevelMid),
@@ -362,83 +327,57 @@
 
     #leaderboard {
       position: fixed;
-      top: 12px;
-      right: 12px;
-      z-index: 5;
-      width: min(320px, calc(100vw - 24px));
-      background: rgba(255,255,255,0.88);
-      border: 1px solid rgba(0,0,0,0.18);
-      border-radius: var(--uiRadius);
-      overflow: hidden;
-      display: none;
+      top: 14px;
+      right: 14px;
+      z-index: 3;
+      width: 260px;
       pointer-events: none;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+      background: rgba(255,255,255,0.92);
+      border: 2px solid rgba(0,0,0,0.20);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.70),
+        inset 0 -1px 0 rgba(0,0,0,0.18),
+        inset 0 -3px 0 rgba(0,0,0,0.20);
     }
 
     #leaderboardHeader {
       padding: 10px 12px;
-      font-weight: 900;
+      font-weight: 800;
       font-size: 14px;
-      letter-spacing: 0.3px;
-      background: rgba(0,0,0,0.04);
+      color: rgba(0,0,0,0.88);
+      background: rgba(0,0,0,0.03);
       border-bottom: 1px solid rgba(0,0,0,0.12);
-      color: rgba(0,0,0,0.85);
-      text-transform: uppercase;
     }
 
     #leaderboardBody {
-      padding: 10px 12px;
+      padding: 8px 10px 10px 10px;
       display: flex;
       flex-direction: column;
       gap: 6px;
-      color: rgba(0,0,0,0.86);
-      font-weight: 700;
-      font-size: 13px;
-      line-height: 1.25;
     }
 
     .lbRow {
       display: flex;
       justify-content: space-between;
       gap: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(0,0,0,0.85);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .lbLeft {
+    .lbName {
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     .lbDmg {
-      font-weight: 900;
-    }
-
-    #slowdownOverlay {
-      position: fixed;
-      left: 50%;
-      top: 22%;
-      transform: translateX(-50%);
-      z-index: 6;
-      display: none;
-      pointer-events: none;
-      font-weight: 900;
-      font-size: clamp(64px, 9vw, 140px);
-      letter-spacing: 2px;
-      color: rgba(255,30,30,0.98);
-      text-shadow:
-        4px 0 rgba(0,0,0,0.85),
-        -4px 0 rgba(0,0,0,0.85),
-        0 4px rgba(0,0,0,0.85),
-        0 -4px rgba(0,0,0,0.85),
-        5px 5px rgba(0,0,0,0.65);
-      animation: slowFlash 0.18s infinite alternate;
-    }
-
-    @keyframes slowFlash {
-      from { transform: translateX(-50%) scale(1); filter: brightness(1); }
-      to   { transform: translateX(-50%) scale(1.03); filter: brightness(1.25); }
+      flex: 0 0 auto;
+      font-variant-numeric: tabular-nums;
     }
   </style>
 </head>
@@ -446,6 +385,11 @@
 <body>
   <canvas id="bg"></canvas>
   <canvas id="c"></canvas>
+
+  <div id="leaderboard" style="display:none;">
+    <div id="leaderboardHeader">Damage</div>
+    <div id="leaderboardBody"></div>
+  </div>
 
   <div id="menu">
     <div id="menuInner">
@@ -463,7 +407,7 @@
         <button id="tutorialClose" class="closeBtn btnOutlinedText">✕</button>
       </div>
       <div id="tutorialBody">
-        <div id="tutorialText">The faster you go, the more damage you can do. Click to apply damage at your speed. If you go too fast, you get punished. Your mouse is your character.</div>
+        <div id="tutorialText">The faster you go, the more damage you can do. Click to apply damage at your speed. Do not go over the speed limit, or you get punished. Your mouse is your character.</div>
       </div>
     </div>
   </div>
@@ -482,30 +426,10 @@
   </div>
 
   <div id="hudBottom">
-    <div id="hudName">Loading...</div>
-
-    <div id="hpBarOuter">
-      <div id="hpBarInner"></div>
-      <div id="hudHpText">0 / 0 HP</div>
-    </div>
-
-    <div id="speedBarOuter">
-      <div id="speedBarInner"></div>
-      <div id="hudSpeedText">Speed: 0/2000</div>
-    </div>
-
-    <div id="killsBarOuter">
-      <div id="killsBarInner"></div>
-      <div id="hudKillsText">Kills: 0/3</div>
+    <div class="barOuter">
+      <div id="killsBarInner" class="barInner"></div>
     </div>
   </div>
-
-  <div id="leaderboard">
-    <div id="leaderboardHeader">Damage Leaderboard</div>
-    <div id="leaderboardBody"></div>
-  </div>
-
-  <div id="slowdownOverlay">SLOW DOWN</div>
 
   <div id="deathScreen">
     <div id="deathCard">
@@ -526,13 +450,11 @@
 
     function openTutorial() { if (tutorialScreen) tutorialScreen.style.display = "flex"; }
     function closeTutorial() { if (tutorialScreen) tutorialScreen.style.display = "none"; }
-
     function openSocials() { if (socialsScreen) socialsScreen.style.display = "flex"; }
     function closeSocials() { if (socialsScreen) socialsScreen.style.display = "none"; }
 
     if (tutorialBtn) tutorialBtn.addEventListener("click", openTutorial);
     if (tutorialClose) tutorialClose.addEventListener("click", closeTutorial);
-
     if (socialsBtn) socialsBtn.addEventListener("click", openSocials);
     if (socialsClose) socialsClose.addEventListener("click", closeSocials);
 
@@ -593,6 +515,6 @@
     drawGrid();
   </script>
 
-  <script src="./main.js" defer></script>
+  <script type="module" src="./main.ts"></script>
 </body>
 </html>

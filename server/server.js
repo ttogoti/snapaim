@@ -139,7 +139,6 @@ wss.on("connection", (ws) => {
                 return;
             me.lastSpeedPenaltyT = tNow;
             me.hp = Math.max(0, me.hp - SPEED_PENALTY_DMG);
-            send(ws, { t: "slowdown" });
             broadcast({ t: "hit", from: "speed", to: me.id, hp: me.hp, maxHp: me.maxHp });
             if (me.hp <= 0) {
                 send(ws, { t: "dead", byName: "Speed" });
