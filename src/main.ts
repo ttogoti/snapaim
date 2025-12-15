@@ -10,51 +10,13 @@ const hudName = document.getElementById("hudName") as HTMLDivElement;
 const hudHpText = document.getElementById("hudHpText") as HTMLDivElement;
 const hpBarInner = document.getElementById("hpBarInner") as HTMLDivElement;
 
+const speedBarOuter = document.getElementById("speedBarOuter") as HTMLDivElement;
 const speedBarInner = document.getElementById("speedBarInner") as HTMLDivElement;
 const hudSpeedText = document.getElementById("hudSpeedText") as HTMLDivElement;
 
 const deathScreen = document.getElementById("deathScreen") as HTMLDivElement;
 const deathBig = document.getElementById("deathBig") as HTMLDivElement;
 const continueBtn = document.getElementById("continueBtn") as HTMLButtonElement;
-
-let roomText = document.getElementById("roomText") as HTMLDivElement | null;
-
-function ensureRoomText() {
-   if (roomText) return;
-   const d = document.createElement("div");
-   d.id = "roomText";
-   d.style.position = "fixed";
-   d.style.top = "10px";
-   d.style.left = "50%";
-   d.style.transform = "translateX(-50%)";
-   d.style.fontWeight = "800";
-   d.style.fontSize = "16px";
-   d.style.color = "rgba(0,0,0,0.75)";
-   d.style.zIndex = "9999";
-   d.style.pointerEvents = "none";
-   d.style.display = "none";
-   d.textContent = "";
-   document.body.appendChild(d);
-   roomText = d;
-}
-
-function showRoomText() {
-   ensureRoomText();
-   if (roomText) roomText.style.display = "block";
-}
-
-function hideRoomText() {
-   if (roomText) {
-      roomText.style.display = "none";
-      roomText.textContent = "";
-   }
-}
-
-function setRoomTextCount(count: number | null) {
-   ensureRoomText();
-   if (!roomText) return;
-   roomText.textContent = count === null ? "Connecting..." : `People in room: ${count}`;
-}
 
 function resize() {
    canvas.width = window.innerWidth;
@@ -128,10 +90,11 @@ function resetSpeedSampler() {
    smoothSpeed = 0;
 
    speedBarInner.style.width = "0%";
-   speedBarInner.style.backgroundImage = "none";
-   speedBarInner.style.background = "hsl(60, 95%, 55%)";
-   speedBarInner.style.opacity = "1";
    hudSpeedText.textContent = `Speed: 0/${SPEED_MAX}`;
+
+   const pct0 = SPEED_MAX > 0 ? 0 : 0;
+   const hue0 = 130 - pct0 * 130;
+   speedBarOuter.style.setProperty("--speedHue", String(hue0));
 }
 
 function updateSpeedFromMouse() {
@@ -157,8 +120,8 @@ function updateSpeedFromMouse() {
 
    speedBarInner.style.width = `${pct * 100}%`;
 
-   const hue = 60 - pct * 60;
-   speedBarInner.style.background = `hsl(${hue}, 95%, 55%)`;
+   const hue = 130 - pct * 130;
+   speedBarOuter.style.setProperty("--speedHue", String(hue));
 
    hudSpeedText.textContent = `Speed: ${Math.round(clamped)}/${SPEED_MAX}`;
 
@@ -181,8 +144,6 @@ function stopConnection() {
 function showDeathScreen(killedBy: string) {
    stopConnection();
 
-   hideRoomText();
-
    hudBottom.style.display = "none";
    menu.style.display = "none";
 
@@ -192,8 +153,6 @@ function showDeathScreen(killedBy: string) {
 
 function resetToMenu() {
    stopConnection();
-
-   hideRoomText();
 
    joined = false;
    myId = null;
@@ -246,9 +205,6 @@ function startGame() {
    hpBarInner.style.background = "hsl(120, 85%, 55%)";
    hpBarInner.style.opacity = "1";
 
-   showRoomText();
-   setRoomTextCount(null);
-
    connect();
 }
 
@@ -260,19 +216,6 @@ nameInput.addEventListener("keydown", (e) => {
       startGame();
    }
 });
-
-function pickRoomCount(msg: any, list: PlayerState[] | null) {
-   const rc =
-      typeof msg?.roomCount === "number" ? msg.roomCount :
-      typeof msg?.count === "number" ? msg.count :
-      typeof msg?.playersInRoom === "number" ? msg.playersInRoom :
-      typeof msg?.room?.count === "number" ? msg.room.count :
-      null;
-
-   if (typeof rc === "number" && isFinite(rc)) return rc;
-   if (Array.isArray(list)) return list.length;
-   return null;
-}
 
 function connect() {
    ws = new WebSocket(WS_URL);
@@ -306,9 +249,6 @@ function connect() {
             myMaxHp = msg.hp;
          }
 
-         const rc = pickRoomCount(msg, null);
-         setRoomTextCount(rc);
-
          wsSend({ t: "setName", name: myName });
          wsSend({ t: "move", x: mouseX, y: mouseY });
          return;
@@ -317,9 +257,6 @@ function connect() {
       if (t === "state") {
          const list = msg.players as PlayerState[] | undefined;
          if (!Array.isArray(list)) return;
-
-         const rc = pickRoomCount(msg, list);
-         setRoomTextCount(rc);
 
          for (const p of list) {
             players.set(p.id, p);
@@ -380,12 +317,6 @@ function connect() {
             }
          }
 
-         return;
-      }
-
-      if (t === "room") {
-         const rc = pickRoomCount(msg, null);
-         setRoomTextCount(rc);
          return;
       }
    });
@@ -493,16 +424,16 @@ function updateBottomHud() {
    const pct = Math.max(0, Math.min(1, me.hp / maxHp));
    hpBarInner.style.width = `${pct * 100}%`;
 
-   const hue = pct * 120;
-   hpBarInner.style.backgroundImage = "none";
-   hpBarInner.style.background = `hsl(${hue}, 85%, 55%)`;
+   const hueHp = pct * 120;
+   hpBarInner.style.background = `linear-gradient(to right, hsl(${hueHp}, 85%, 50%), hsl(${hueHp}, 85%, 58%))`;
    hpBarInner.style.opacity = "1";
 
-   const capPct = SPEED_MAX_CAP > 0 ? SPEED_MAX / SPEED_MAX_CAP : 0;
-   const shownMax = Math.round(SPEED_MAX);
-   const hue2 = 60 - Math.max(0, Math.min(1, capPct)) * 60;
-   speedBarInner.style.background = `hsl(${hue2}, 95%, 55%)`;
-   hudSpeedText.textContent = hudSpeedText.textContent || `Speed: 0/${shownMax}`;
+   const clamped = Math.max(0, Math.min(SPEED_MAX, smoothSpeed));
+   const pctS = SPEED_MAX > 0 ? clamped / SPEED_MAX : 0;
+   speedBarInner.style.width = `${pctS * 100}%`;
+
+   const hue = 130 - pctS * 130;
+   speedBarOuter.style.setProperty("--speedHue", String(hue));
 }
 
 function loop() {
@@ -548,5 +479,4 @@ function loop() {
    requestAnimationFrame(loop);
 }
 
-hideRoomText();
 loop();
