@@ -189,18 +189,49 @@
       color: rgba(0,0,0,0.85);
     }
 
-    #hpBarOuter, #speedBarOuter {
+     #hpBarOuter, #speedBarOuter {
       position: relative;
       width: 100%;
-      height: 18px;
-      border-radius: 0;
+      height: 22px;
+      border-radius: var(--uiRadius);
       overflow: hidden;
-      background: rgba(0,0,0,0.08);
-      border: 1px solid rgba(0,0,0,0.12);
+      border: var(--borderW) solid rgba(0,0,0,0.22);
+      background: linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.75) 0%,
+        rgba(255,255,255,0.55) 60%,
+        rgba(0,0,0,0.12) 60%,
+        rgba(0,0,0,0.18) 100%
+      );
+      box-shadow:
+        inset 0 1px 0 var(--bevelTop),
+        inset 0 -1px 0 var(--bevelMid),
+        inset 0 -3px 0 var(--bevelDeep);
     }
 
-    #hpBarInner { height: 100%; width: 100%; background: #3ddc84; }
-    #speedBarInner { height: 100%; width: 0%; background: hsl(60, 95%, 55%); }
+    #hpBarInner {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(
+        to bottom,
+        #7fe27f 0%,
+        #7fe27f 66.666%,
+        #4fbf4f 66.666%,
+        #4fbf4f 100%
+      );
+    }
+
+    #speedBarInner {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(
+        to bottom,
+        #fff27f 0%,
+        #fff27f 66.666%,
+        #d6c93d 66.666%,
+        #d6c93d 100%
+      );
+    }
 
     #hudHpText, #hudSpeedText {
       position: absolute;
@@ -208,12 +239,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 600;
+      font-weight: 700;
       font-size: 13px;
-      color: rgba(0,0,0,0.85);
+      color: rgba(0,0,0,0.9);
       user-select: none;
       z-index: 2;
     }
+
 
     #deathScreen, #tutorialScreen, #socialsScreen {
       position: fixed;
