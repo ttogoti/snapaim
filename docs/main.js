@@ -13,6 +13,31 @@ const hudSpeedText = document.getElementById("hudSpeedText");
 const deathScreen = document.getElementById("deathScreen");
 const deathBig = document.getElementById("deathBig");
 const continueBtn = document.getElementById("continueBtn");
+let roomText = document.getElementById("roomText");
+function ensureRoomText() {
+    if (roomText)
+        return;
+    const d = document.createElement("div");
+    d.id = "roomText";
+    d.style.position = "fixed";
+    d.style.top = "10px";
+    d.style.left = "50%";
+    d.style.transform = "translateX(-50%)";
+    d.style.fontWeight = "800";
+    d.style.fontSize = "16px";
+    d.style.color = "rgba(0,0,0,0.75)";
+    d.style.zIndex = "9999";
+    d.style.pointerEvents = "none";
+    d.textContent = "Connecting...";
+    document.body.appendChild(d);
+    roomText = d;
+}
+function setRoomTextCount(count) {
+    ensureRoomText();
+    if (!roomText)
+        return;
+    roomText.textContent = count === null ? "Connecting..." : `People in room: ${count}`;
+}
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -46,39 +71,8 @@ function wsSend(payload) {
         out.t = out.type;
     ws.send(JSON.stringify(out));
 }
-const roomInfo = document.createElement("div");
-roomInfo.id = "roomInfo";
-roomInfo.style.position = "fixed";
-roomInfo.style.top = "18px";
-roomInfo.style.left = "50%";
-roomInfo.style.transform = "translateX(-50%)";
-roomInfo.style.zIndex = "6";
-roomInfo.style.pointerEvents = "none";
-roomInfo.style.fontFamily = '"Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
-roomInfo.style.fontSize = "16px";
-roomInfo.style.fontWeight = "800";
-roomInfo.style.color = "rgba(0,0,0,0.85)";
-roomInfo.style.textShadow = "1.5px 0 rgba(255,255,255,0.85), -1.5px 0 rgba(255,255,255,0.85), 0 1.5px rgba(255,255,255,0.85), 0 -1.5px rgba(255,255,255,0.85)";
-roomInfo.style.display = "none";
-roomInfo.textContent = "";
-document.body.appendChild(roomInfo);
-let roomCount = null;
-function setRoomTextConnecting() {
-    roomInfo.style.display = "block";
-    roomInfo.textContent = "Connecting...";
-}
-function setRoomTextCount(n) {
-    if (n === null)
-        return setRoomTextConnecting();
-    roomInfo.style.display = "block";
-    roomInfo.textContent = `People in room: ${n}`;
-}
-function hideRoomText() {
-    roomInfo.style.display = "none";
-    roomInfo.textContent = "";
-    roomCount = null;
-}
-const SPEED_MAX = 2000;
+let SPEED_MAX = 2000;
+const SPEED_MAX_CAP = 3500;
 let lastSpeedT = performance.now();
 let lastSpeedX = mouseX;
 let lastSpeedY = mouseY;
@@ -111,7 +105,7 @@ function updateSpeedFromMouse() {
     lastSpeedX = mouseX;
     lastSpeedY = mouseY;
     const clamped = Math.max(0, Math.min(SPEED_MAX, smoothSpeed));
-    const pct = clamped / SPEED_MAX;
+    const pct = SPEED_MAX > 0 ? clamped / SPEED_MAX : 0;
     speedBarInner.style.width = `${pct * 100}%`;
     const hue = 60 - pct * 60;
     speedBarInner.style.background = `hsl(${hue}, 95%, 55%)`;
@@ -136,7 +130,6 @@ function showDeathScreen(killedBy) {
     stopConnection();
     hudBottom.style.display = "none";
     menu.style.display = "none";
-    hideRoomText();
     deathBig.textContent = killedBy;
     deathScreen.style.display = "flex";
 }
@@ -155,7 +148,7 @@ function resetToMenu() {
     hudName.textContent = "";
     hudHpText.textContent = "";
     hpBarInner.style.width = "0%";
-    hideRoomText();
+    setRoomTextCount(null);
     nameInput.value = "";
     nameInput.focus();
 }
@@ -182,7 +175,7 @@ function startGame() {
     hpBarInner.style.backgroundImage = "none";
     hpBarInner.style.background = "hsl(120, 85%, 55%)";
     hpBarInner.style.opacity = "1";
-    setRoomTextConnecting();
+    setRoomTextCount(null);
     connect();
 }
 playBtn.addEventListener("click", () => startGame());
@@ -192,6 +185,18 @@ nameInput.addEventListener("keydown", (e) => {
         startGame();
     }
 });
+function pickRoomCount(msg, list) {
+    const rc = typeof msg?.roomCount === "number" ? msg.roomCount :
+        typeof msg?.count === "number" ? msg.count :
+            typeof msg?.playersInRoom === "number" ? msg.playersInRoom :
+                typeof msg?.room?.count === "number" ? msg.room.count :
+                    null;
+    if (typeof rc === "number" && isFinite(rc))
+        return rc;
+    if (Array.isArray(list))
+        return list.length;
+    return null;
+}
 function connect() {
     ws = new WebSocket(WS_URL);
     ws.addEventListener("open", () => {
@@ -204,18 +209,6 @@ function connect() {
     ws.addEventListener("message", (ev) => {
         const msg = JSON.parse(ev.data);
         const t = msgType(msg);
-        if (typeof msg.roomCount === "number") {
-            roomCount = msg.roomCount;
-            setRoomTextCount(roomCount);
-        }
-        if (t === "room") {
-            const rc = msg.roomCount;
-            if (typeof rc === "number") {
-                roomCount = rc;
-                setRoomTextCount(roomCount);
-            }
-            return;
-        }
         if (t === "dead") {
             const byName = typeof msg.byName === "string" ? msg.byName : null;
             showDeathScreen(byName ?? lastKillerName ?? "Unknown");
@@ -230,13 +223,8 @@ function connect() {
             else if (typeof msg.hp === "number" && msg.hp > 0 && myMaxHp === null) {
                 myMaxHp = msg.hp;
             }
-            if (typeof msg.roomCount === "number") {
-                roomCount = msg.roomCount;
-                setRoomTextCount(roomCount);
-            }
-            else {
-                setRoomTextConnecting();
-            }
+            const rc = pickRoomCount(msg, null);
+            setRoomTextCount(rc);
             wsSend({ t: "setName", name: myName });
             wsSend({ t: "move", x: mouseX, y: mouseY });
             return;
@@ -245,6 +233,8 @@ function connect() {
             const list = msg.players;
             if (!Array.isArray(list))
                 return;
+            const rc = pickRoomCount(msg, list);
+            setRoomTextCount(rc);
             for (const p of list) {
                 players.set(p.id, p);
                 if (p.id !== myId) {
@@ -304,6 +294,11 @@ function connect() {
             }
             return;
         }
+        if (t === "room") {
+            const rc = pickRoomCount(msg, null);
+            setRoomTextCount(rc);
+            return;
+        }
     });
     ws.addEventListener("close", () => {
         if (heartbeat !== null) {
@@ -334,7 +329,7 @@ window.addEventListener("pointermove", (e) => {
 window.addEventListener("pointerdown", (e) => {
     if (!ws || ws.readyState !== WebSocket.OPEN)
         return;
-    wsSend({ t: "click", x: e.clientX, y: e.clientY, speed: smoothSpeed });
+    wsSend({ t: "click", x: e.clientX, y: e.clientY });
 });
 function maxHpForPlayer(p) {
     if (typeof p.maxHp === "number" && p.maxHp > 0)
@@ -396,8 +391,11 @@ function updateBottomHud() {
     hpBarInner.style.backgroundImage = "none";
     hpBarInner.style.background = `hsl(${hue}, 85%, 55%)`;
     hpBarInner.style.opacity = "1";
-    if (roomCount === null)
-        setRoomTextConnecting();
+    const capPct = SPEED_MAX_CAP > 0 ? SPEED_MAX / SPEED_MAX_CAP : 0;
+    const shownMax = Math.round(SPEED_MAX);
+    const hue2 = 60 - Math.max(0, Math.min(1, capPct)) * 60;
+    speedBarInner.style.background = `hsl(${hue2}, 95%, 55%)`;
+    hudSpeedText.textContent = hudSpeedText.textContent || `Speed: 0/${shownMax}`;
 }
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -432,4 +430,5 @@ function loop() {
     updateBottomHud();
     requestAnimationFrame(loop);
 }
+setRoomTextCount(null);
 loop();
