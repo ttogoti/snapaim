@@ -192,10 +192,9 @@
     #hpBarOuter, #speedBarOuter {
       position: relative;
       width: 100%;
-      height: 22px;
+      height: 18px;
       border-radius: var(--uiRadius);
       overflow: hidden;
-      padding: 2px;
       border: var(--borderW) solid rgba(0,0,0,0.22);
       background: linear-gradient(
         to bottom,
@@ -208,13 +207,22 @@
         inset 0 1px 0 var(--bevelTop),
         inset 0 -1px 0 var(--bevelMid),
         inset 0 -3px 0 var(--bevelDeep);
+      z-index: 1;
     }
 
 
-    #hpBarInner {
+
+    #hpBarInner,
+    #speedBarInner {
+      position: absolute;
+      left: 0;
+      top: 0;
       height: 100%;
+      z-index: 0;
+    }
+
+    #hpBarInner {
       width: 100%;
-      border-radius: calc(var(--uiRadius) - 2px);
       background: linear-gradient(
         to bottom,
         #7fe27f 0%,
@@ -225,9 +233,7 @@
     }
 
     #speedBarInner {
-      height: 100%;
       width: 0%;
-      border-radius: calc(var(--uiRadius) - 2px);
       background: linear-gradient(
         to bottom,
         #fff27f 0%,
@@ -236,6 +242,7 @@
         #d6c93d 100%
       );
     }
+
 
 
     #hudHpText, #hudSpeedText {
