@@ -399,16 +399,26 @@ function connect() {
         }
       }
 
-      if (myId && to === myId) {
+    if (myId && to === myId) {
         const from = msg.from;
+
         if (typeof from === "string") {
-          const killer = players.get(from);
-          lastKillerName = (killer?.name && killer.name.trim().length) ? killer.name : from.slice(0, 4);
+            if (from === "speed") {
+                lastKillerName = "Speed";
+            } else {
+                const killer = players.get(from);
+                lastKillerName =
+                    (killer?.name && killer.name.trim().length)
+                        ? killer.name
+                        : from.slice(0, 4);
+            }
         }
+
         if (typeof hp === "number" && hp <= 0) {
-          showDeathScreen(lastKillerName ?? "Unknown");
+            showDeathScreen(lastKillerName ?? "Unknown");
         }
-      }
+    }
+
 
       return;
     }
@@ -500,12 +510,12 @@ function drawMouseBars() {
   const hpPct = Math.max(0, Math.min(1, me.hp / maxHp));
   const spPct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
 
-  const w = 120;
-  const h = 8;
-  const r = 5;
+  const w = 112;
+  const h = 9;
+  const r = 6;
 
   const hpX = mouseX - w / 2;
-  const hpY = mouseY - hitRadius - 28;
+  const hpY = mouseY - hitRadius - 18;
 
   ctx.save();
 
@@ -527,7 +537,7 @@ function drawMouseBars() {
   ctx.stroke();
 
   const spX = mouseX - w / 2;
-  const spY = mouseY - hitRadius - 16;
+  const spY = mouseY - hitRadius + 10;
 
   ctx.fillStyle = "rgba(0,0,0,0.18)";
   roundedRect(spX, spY, w, h, r);
@@ -647,7 +657,12 @@ function updateLevelBar() {
 
   const pct = Math.max(0, Math.min(1, inLvl / need));
 
-  levelBarInner.style.width = `${pct * 100}%`;
+  if (pct <= 0) {
+    levelBarInner.style.width = "14px";
+} else {
+    levelBarInner.style.width = `${pct * 100}%`;
+}
+
   levelBarInner.style.background = "linear-gradient(to bottom, #7fb6ff 0%, #7fb6ff 66.666%, #2f76ff 66.666%, #2f76ff 100%)";
   levelBarText.textContent = `Level: ${level}`;
 }

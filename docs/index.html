@@ -209,16 +209,19 @@
       align-items: center;
       justify-content: center;
       font-weight: 900;
-      font-size: 13px;
-      color: rgba(255,255,255,0.98);
+      font-size: 12px;
+      line-height: 1;
+      color: rgba(255, 255, 255, 0.98);
       user-select: none;
       pointer-events: none;
       text-shadow:
-        2px 0 rgba(0,0,0,0.92),
-        -2px 0 rgba(0,0,0,0.92),
-        0 2px rgba(0,0,0,0.92),
-        0 -2px rgba(0,0,0,0.92);
-    }
+          1px 0 rgba(0, 0, 0, 0.85),
+          -1px 0 rgba(0, 0, 0, 0.85),
+          0 1px rgba(0, 0, 0, 0.85),
+          0 -1px rgba(0, 0, 0, 0.85);
+      -webkit-font-smoothing: antialiased;
+      -moz-
+
 
     #deathScreen, #tutorialScreen, #socialsScreen {
       position: fixed;
@@ -452,7 +455,7 @@
 
   <div id="deathScreen">
     <div id="deathCard">
-      <div id="deathSmall">You were killed by</div>
+      <div id="deathSmall">You died to</div>
       <div id="deathBig">Unknown</div>
       <button id="continueBtn" class="uiBtn uiBtnSm btnOutlinedText btnGray">Continue</button>
     </div>
