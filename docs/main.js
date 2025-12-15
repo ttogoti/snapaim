@@ -46,6 +46,38 @@ function wsSend(payload) {
         out.t = out.type;
     ws.send(JSON.stringify(out));
 }
+const roomInfo = document.createElement("div");
+roomInfo.id = "roomInfo";
+roomInfo.style.position = "fixed";
+roomInfo.style.top = "18px";
+roomInfo.style.left = "50%";
+roomInfo.style.transform = "translateX(-50%)";
+roomInfo.style.zIndex = "6";
+roomInfo.style.pointerEvents = "none";
+roomInfo.style.fontFamily = '"Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif';
+roomInfo.style.fontSize = "16px";
+roomInfo.style.fontWeight = "800";
+roomInfo.style.color = "rgba(0,0,0,0.85)";
+roomInfo.style.textShadow = "1.5px 0 rgba(255,255,255,0.85), -1.5px 0 rgba(255,255,255,0.85), 0 1.5px rgba(255,255,255,0.85), 0 -1.5px rgba(255,255,255,0.85)";
+roomInfo.style.display = "none";
+roomInfo.textContent = "";
+document.body.appendChild(roomInfo);
+let roomCount = null;
+function setRoomTextConnecting() {
+    roomInfo.style.display = "block";
+    roomInfo.textContent = "Connecting...";
+}
+function setRoomTextCount(n) {
+    if (n === null)
+        return setRoomTextConnecting();
+    roomInfo.style.display = "block";
+    roomInfo.textContent = `People in room: ${n}`;
+}
+function hideRoomText() {
+    roomInfo.style.display = "none";
+    roomInfo.textContent = "";
+    roomCount = null;
+}
 const SPEED_MAX = 2000;
 let lastSpeedT = performance.now();
 let lastSpeedX = mouseX;
@@ -84,7 +116,7 @@ function updateSpeedFromMouse() {
     const hue = 60 - pct * 60;
     speedBarInner.style.background = `hsl(${hue}, 95%, 55%)`;
     hudSpeedText.textContent = `Speed: ${Math.round(clamped)}/${SPEED_MAX}`;
-    if (joined && tNow - joinTimeMs > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
+    if (joined && (tNow - joinTimeMs) > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
         showDeathScreen("Speed");
     }
 }
@@ -104,6 +136,7 @@ function showDeathScreen(killedBy) {
     stopConnection();
     hudBottom.style.display = "none";
     menu.style.display = "none";
+    hideRoomText();
     deathBig.textContent = killedBy;
     deathScreen.style.display = "flex";
 }
@@ -122,6 +155,7 @@ function resetToMenu() {
     hudName.textContent = "";
     hudHpText.textContent = "";
     hpBarInner.style.width = "0%";
+    hideRoomText();
     nameInput.value = "";
     nameInput.focus();
 }
@@ -148,6 +182,7 @@ function startGame() {
     hpBarInner.style.backgroundImage = "none";
     hpBarInner.style.background = "hsl(120, 85%, 55%)";
     hpBarInner.style.opacity = "1";
+    setRoomTextConnecting();
     connect();
 }
 playBtn.addEventListener("click", () => startGame());
@@ -169,6 +204,18 @@ function connect() {
     ws.addEventListener("message", (ev) => {
         const msg = JSON.parse(ev.data);
         const t = msgType(msg);
+        if (typeof msg.roomCount === "number") {
+            roomCount = msg.roomCount;
+            setRoomTextCount(roomCount);
+        }
+        if (t === "room") {
+            const rc = msg.roomCount;
+            if (typeof rc === "number") {
+                roomCount = rc;
+                setRoomTextCount(roomCount);
+            }
+            return;
+        }
         if (t === "dead") {
             const byName = typeof msg.byName === "string" ? msg.byName : null;
             showDeathScreen(byName ?? lastKillerName ?? "Unknown");
@@ -182,6 +229,13 @@ function connect() {
             }
             else if (typeof msg.hp === "number" && msg.hp > 0 && myMaxHp === null) {
                 myMaxHp = msg.hp;
+            }
+            if (typeof msg.roomCount === "number") {
+                roomCount = msg.roomCount;
+                setRoomTextCount(roomCount);
+            }
+            else {
+                setRoomTextConnecting();
             }
             wsSend({ t: "setName", name: myName });
             wsSend({ t: "move", x: mouseX, y: mouseY });
@@ -209,9 +263,7 @@ function connect() {
                     if (typeof meFromList.maxHp === "number" && meFromList.maxHp > 0) {
                         myMaxHp = meFromList.maxHp;
                     }
-                    else if (myMaxHp === null &&
-                        typeof meFromList.hp === "number" &&
-                        meFromList.hp > 0) {
+                    else if (myMaxHp === null && typeof meFromList.hp === "number" && meFromList.hp > 0) {
                         myMaxHp = meFromList.hp;
                     }
                 }
@@ -244,8 +296,7 @@ function connect() {
                 const from = msg.from;
                 if (typeof from === "string") {
                     const killer = players.get(from);
-                    lastKillerName =
-                        killer?.name && killer.name.trim().length ? killer.name : from.slice(0, 4);
+                    lastKillerName = (killer?.name && killer.name.trim().length) ? killer.name : from.slice(0, 4);
                 }
                 if (typeof hp === "number" && hp <= 0) {
                     showDeathScreen(lastKillerName ?? "Unknown");
@@ -283,7 +334,7 @@ window.addEventListener("pointermove", (e) => {
 window.addEventListener("pointerdown", (e) => {
     if (!ws || ws.readyState !== WebSocket.OPEN)
         return;
-    wsSend({ t: "click", x: e.clientX, y: e.clientY });
+    wsSend({ t: "click", x: e.clientX, y: e.clientY, speed: smoothSpeed });
 });
 function maxHpForPlayer(p) {
     if (typeof p.maxHp === "number" && p.maxHp > 0)
@@ -336,7 +387,7 @@ function updateBottomHud() {
     const me = players.get(myId);
     if (!me)
         return;
-    const maxHp = myMaxHp !== null && myMaxHp > 0 ? myMaxHp : maxHpForPlayer(me);
+    const maxHp = (myMaxHp !== null && myMaxHp > 0) ? myMaxHp : maxHpForPlayer(me);
     hudName.textContent = me.name || myName || "Player";
     hudHpText.textContent = `${Math.round(me.hp).toLocaleString()} / ${Math.round(maxHp).toLocaleString()} HP`;
     const pct = Math.max(0, Math.min(1, me.hp / maxHp));
@@ -345,6 +396,8 @@ function updateBottomHud() {
     hpBarInner.style.backgroundImage = "none";
     hpBarInner.style.background = `hsl(${hue}, 85%, 55%)`;
     hpBarInner.style.opacity = "1";
+    if (roomCount === null)
+        setRoomTextConnecting();
 }
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -364,7 +417,7 @@ function loop() {
         ctx.arc(x, y, hitRadius, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(90,240,150,0.95)";
         ctx.fill();
-        const label = p.name && p.name.trim().length ? p.name : p.id.slice(0, 4);
+        const label = (p.name && p.name.trim().length) ? p.name : p.id.slice(0, 4);
         ctx.font = "12px Ubuntu, system-ui";
         ctx.textAlign = "center";
         ctx.textBaseline = "alphabetic";

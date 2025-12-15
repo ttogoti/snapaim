@@ -1,182 +1,231 @@
-import { WebSocketServer } from "ws";
-import { randomUUID } from "crypto";
-
-type Vec2 = { x: number; y: number };
-type Sample = { t: number; p: Vec2 };
-
-type WebSocket = import("ws").WebSocket;
+import http from "http";
+import { WebSocketServer, WebSocket } from "ws";
 
 type Player = {
-  id: string;
-  ws: WebSocket;
-  name: string;
-  pos: Vec2;
-  hp: number;
-  maxHp: number;
-  history: Sample[];
+   id: string;
+   name: string;
+   x: number;
+   y: number;
+   hp: number;
+   maxHp: number;
+   roomId: string;
+   lastClickT: number;
 };
 
-const PORT = Number(process.env.PORT ?? 8080);
+type Room = {
+   id: string;
+   players: Map<string, Player>;
+};
 
-const START_HP = 10_000;
+const PORT = process.env.PORT ? Number(process.env.PORT) : 8080;
+
+const CAPACITY = 8;
+
+const MAX_HP = 100000;
 const HIT_RADIUS = 22;
-const HISTORY_MS = 250;
-const SPEED_WINDOW_MS = 120;
-const MAX_REPORTED_COORD = 100000;
 
-const MAX_SPEED_FOR_DAMAGE = 50_000;
+const STATE_TICK_MS = 50;
 
-const wss = new WebSocketServer({ port: PORT });
-const players = new Map<string, Player>();
+const server = http.createServer();
+const wss = new WebSocketServer({ server });
 
-function nowMs() { return Date.now(); }
-function clamp(v: number, lo: number, hi: number) { return Math.max(lo, Math.min(hi, v)); }
-function dist(a: Vec2, b: Vec2) { return Math.hypot(a.x - b.x, a.y - b.y); }
+const rooms = new Map<string, Room>();
+let nextRoomN = 1;
 
-function msgType(msg: any): string | undefined {
-  return msg?.t ?? msg?.type;
+function rid() {
+   const r = nextRoomN++;
+   return `room-${r}`;
 }
 
-function send(ws: WebSocket, obj: any) {
-  if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
+function pid() {
+   return Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
 }
 
-function broadcast(obj: any) {
-  const msg = JSON.stringify(obj);
-  for (const p of players.values()) {
-    if (p.ws.readyState === p.ws.OPEN) p.ws.send(msg);
-  }
+function now() {
+   return Date.now();
 }
 
-function pruneHistory(p: Player, t: number) {
-  const cutoff = t - HISTORY_MS;
-  while (p.history.length && p.history[0].t < cutoff) p.history.shift();
+function msgType(m: any) {
+   return m?.t ?? m?.type;
 }
 
-function computeSpeedPxPerSec(p: Player, tEnd: number) {
-  const tStart = tEnd - SPEED_WINDOW_MS;
-
-  let first: Sample | null = null;
-  let last: Sample | null = null;
-
-  for (const s of p.history) {
-    if (s.t >= tStart && !first) first = s;
-    if (s.t <= tEnd) last = s;
-  }
-  if (!first || !last || last.t === first.t) return 0;
-
-  const d = dist(first.p, last.p);
-  const dt = (last.t - first.t) / 1000;
-  return dt > 0 ? d / dt : 0;
+function wsSend(ws: WebSocket, payload: any) {
+   if (ws.readyState !== WebSocket.OPEN) return;
+   const out = { ...payload };
+   if (out.t && !out.type) out.type = out.t;
+   if (out.type && !out.t) out.t = out.type;
+   ws.send(JSON.stringify(out));
 }
 
-function snapshot() {
-  return Array.from(players.values()).map((p) => ({
-    id: p.id,
-    name: p.name,
-    x: p.pos.x,
-    y: p.pos.y,
-    hp: p.hp,
-    maxHp: p.maxHp
-  }));
+function getOrCreateRoom(): Room {
+   for (const r of rooms.values()) {
+      if (r.players.size < CAPACITY) return r;
+   }
+   const id = rid();
+   const room: Room = { id, players: new Map() };
+   rooms.set(id, room);
+   return room;
+}
+
+function roomCountBroadcast(room: Room) {
+   const count = room.players.size;
+   for (const p of room.players.values()) {
+      const ws = sockets.get(p.id);
+      if (ws) wsSend(ws, { t: "room", roomId: room.id, roomCount: count });
+   }
+}
+
+function stateBroadcast(room: Room) {
+   const list = Array.from(room.players.values()).map((p) => ({
+      id: p.id,
+      name: p.name,
+      x: p.x,
+      y: p.y,
+      hp: p.hp,
+      maxHp: p.maxHp
+   }));
+   for (const p of room.players.values()) {
+      const ws = sockets.get(p.id);
+      if (ws) wsSend(ws, { t: "state", roomId: room.id, roomCount: room.players.size, players: list });
+   }
+}
+
+const sockets = new Map<string, WebSocket>();
+
+function removePlayer(p: Player) {
+   const room = rooms.get(p.roomId);
+   sockets.delete(p.id);
+   if (!room) return;
+   room.players.delete(p.id);
+   if (room.players.size === 0) rooms.delete(room.id);
+   else roomCountBroadcast(room);
+}
+
+function applyHit(attacker: Player, target: Player, damage: number) {
+   target.hp = Math.max(0, target.hp - damage);
+   const room = rooms.get(attacker.roomId);
+   if (!room) return;
+
+   for (const p of room.players.values()) {
+      const ws = sockets.get(p.id);
+      if (!ws) continue;
+      wsSend(ws, { t: "hit", from: attacker.id, to: target.id, hp: target.hp });
+   }
+
+   if (target.hp <= 0) {
+      const wsDead = sockets.get(target.id);
+      if (wsDead) wsSend(wsDead, { t: "dead", byName: attacker.name });
+      removePlayer(target);
+   }
+}
+
+function findPlayerAt(room: Room, x: number, y: number, excludeId: string) {
+   let best: Player | null = null;
+   let bestD = Infinity;
+   for (const p of room.players.values()) {
+      if (p.id === excludeId) continue;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d <= HIT_RADIUS && d < bestD) {
+         best = p;
+         bestD = d;
+      }
+   }
+   return best;
 }
 
 wss.on("connection", (ws) => {
-  const id = randomUUID();
-  const t = nowMs();
+   const room = getOrCreateRoom();
+   const id = pid();
 
-  const p: Player = {
-    id,
-    ws,
-    name: "Player",
-    pos: { x: 0, y: 0 },
-    hp: START_HP,
-    maxHp: START_HP,
-    history: [{ t, p: { x: 0, y: 0 } }]
-  };
+   const player: Player = {
+      id,
+      name: id.slice(0, 4),
+      x: 0,
+      y: 0,
+      hp: MAX_HP,
+      maxHp: MAX_HP,
+      roomId: room.id,
+      lastClickT: 0
+   };
 
-  players.set(id, p);
+   room.players.set(id, player);
+   sockets.set(id, ws);
 
-  send(ws, { t: "welcome", id, hp: p.hp, maxHp: p.maxHp, hitRadius: HIT_RADIUS });
+   wsSend(ws, {
+      t: "welcome",
+      id,
+      hitRadius: HIT_RADIUS,
+      hp: player.hp,
+      maxHp: player.maxHp,
+      roomId: room.id,
+      roomCount: room.players.size
+   });
 
-  broadcast({ t: "state", players: snapshot() });
+   roomCountBroadcast(room);
 
-  ws.on("message", (raw: Buffer) => {
-    let msg: any;
-    try { msg = JSON.parse(raw.toString("utf8")); } catch { return; }
+   ws.on("message", (buf) => {
+      let msg: any;
+      try {
+         msg = JSON.parse(buf.toString());
+      } catch {
+         return;
+      }
 
-    const tNow = nowMs();
-    const type = msgType(msg);
+      const t = msgType(msg);
+      const me = rooms.get(player.roomId)?.players.get(player.id);
+      if (!me) return;
 
-    if (type === "setName") {
-      if (typeof msg.name !== "string") return;
-      const clean = msg.name.trim().slice(0, 18);
-      p.name = clean.length ? clean : "Player";
-      return;
-    }
+      if (t === "setName") {
+         const name = typeof msg.name === "string" ? msg.name.trim().slice(0, 18) : "";
+         if (name.length) me.name = name;
+         return;
+      }
 
-    if (type === "move") {
-      if (typeof msg.x !== "number" || typeof msg.y !== "number") return;
+      if (t === "move") {
+         const x = typeof msg.x === "number" ? msg.x : me.x;
+         const y = typeof msg.y === "number" ? msg.y : me.y;
+         me.x = x;
+         me.y = y;
+         return;
+      }
 
-      const x = clamp(msg.x, -MAX_REPORTED_COORD, MAX_REPORTED_COORD);
-      const y = clamp(msg.y, -MAX_REPORTED_COORD, MAX_REPORTED_COORD);
+      if (t === "click") {
+         const roomNow = rooms.get(me.roomId);
+         if (!roomNow) return;
 
-      p.pos = { x, y };
-      p.history.push({ t: tNow, p: { x, y } });
-      pruneHistory(p, tNow);
-      return;
-    }
+         const x = typeof msg.x === "number" ? msg.x : me.x;
+         const y = typeof msg.y === "number" ? msg.y : me.y;
 
-    if (type === "click") {
-      const spd = computeSpeedPxPerSec(p, tNow);
-      const dmg = Math.round(clamp(spd, 0, MAX_SPEED_FOR_DAMAGE));
+         const speed = typeof msg.speed === "number" ? Math.max(0, msg.speed) : 0;
+         const damage = Math.floor(speed);
 
-      let clickPos: Vec2 = p.pos;
-      if (typeof msg.x === "number" && typeof msg.y === "number") {
-        clickPos = {
-          x: clamp(msg.x, -MAX_REPORTED_COORD, MAX_REPORTED_COORD),
-          y: clamp(msg.y, -MAX_REPORTED_COORD, MAX_REPORTED_COORD)
-        };
-      }
+         const tNow = now();
+         if (tNow - me.lastClickT < 80) return;
+         me.lastClickT = tNow;
 
-      let target: Player | null = null;
-      let best = Infinity;
+         if (damage <= 0) return;
 
-      for (const other of players.values()) {
-        if (other.id === p.id) continue;
-        if (other.hp <= 0) continue;
+         const target = findPlayerAt(roomNow, x, y, me.id);
+         if (!target) return;
 
-        const d = dist(other.pos, clickPos);
-        if (d <= HIT_RADIUS && d < best) {
-          best = d;
-          target = other;
-        }
-      }
+         applyHit(me, target, damage);
+         return;
+      }
+   });
 
-      if (!target) return;
+   ws.on("close", () => {
+      const me = rooms.get(player.roomId)?.players.get(player.id);
+      if (me) removePlayer(me);
+   });
 
-      target.hp = Math.max(0, target.hp - dmg);
-
-      broadcast({
-        t: "hit",
-        from: p.id,
-        to: target.id,
-        dmg,
-        hp: target.hp
-      });
-
-      return;
-    }
-  });
-
-  ws.on("close", () => {
-    players.delete(id);
-    broadcast({ t: "state", players: snapshot() });
-  });
+   ws.on("error", () => {
+      const me = rooms.get(player.roomId)?.players.get(player.id);
+      if (me) removePlayer(me);
+   });
 });
 
 setInterval(() => {
-  broadcast({ t: "state", players: snapshot() });
-}, 1000 / 30);
+   for (const room of rooms.values()) stateBroadcast(room);
+}, STATE_TICK_MS);
 
-console.log(`Server running on ws://localhost:${PORT} | START_HP=${START_HP}`);
+server.listen(PORT);
