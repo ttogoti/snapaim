@@ -193,32 +193,31 @@
       position: relative;
       width: 100%;
       height: 18px;
-      border-radius: var(--uiRadius);
+      border-radius: 0;
       overflow: hidden;
-      border: var(--borderW) solid rgba(0,0,0,0.22);
-      background: linear-gradient(
-        to bottom,
-        rgba(255,255,255,0.75) 0%,
-        rgba(255,255,255,0.55) 60%,
-        rgba(0,0,0,0.12) 60%,
-        rgba(0,0,0,0.18) 100%
-      );
-      box-shadow:
-        inset 0 1px 0 var(--bevelTop),
-        inset 0 -1px 0 var(--bevelMid),
-        inset 0 -3px 0 var(--bevelDeep);
-      z-index: 1;
+      background: rgba(0,0,0,0.08);
     }
 
+    #hpBarOuter::after, #speedBarOuter::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      border: 1px solid rgba(0,0,0,0.12);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.75),
+        inset 0 -1px 0 rgba(0,0,0,0.18),
+        inset 0 -3px 0 rgba(0,0,0,0.22);
+      z-index: 2;
+      pointer-events: none;
+    }
 
-
-    #hpBarInner,
-    #speedBarInner {
+    #hpBarInner, #speedBarInner {
       position: absolute;
       left: 0;
       top: 0;
       height: 100%;
-      z-index: 0;
+      z-index: 1;
     }
 
     #hpBarInner {
@@ -236,14 +235,12 @@
       width: 0%;
       background: linear-gradient(
         to bottom,
-        #fff27f 0%,
-        #fff27f 66.666%,
-        #d6c93d 66.666%,
-        #d6c93d 100%
+        #ff9a3a 0%,
+        #ff9a3a 66.666%,
+        #ff7a00 66.666%,
+        #ff7a00 100%
       );
     }
-
-
 
     #hudHpText, #hudSpeedText {
       position: absolute;
@@ -251,12 +248,18 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
-      font-size: 13px;
-      color: rgba(0,0,0,0.9);
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.2px;
+      color: rgba(0,0,0,0.92);
+      text-shadow:
+        0 1px 0 rgba(255,255,255,0.6),
+        0 -1px 0 rgba(0,0,0,0.25);
       user-select: none;
-      z-index: 2;
+      z-index: 3;
+      pointer-events: none;
     }
+
 
 
     #deathScreen, #tutorialScreen, #socialsScreen {
