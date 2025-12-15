@@ -498,10 +498,7 @@ function updateBottomHud() {
    hpBarInner.style.background = `hsl(${hue}, 85%, 55%)`;
    hpBarInner.style.opacity = "1";
 
-   const capPct = SPEED_MAX_CAP > 0 ? SPEED_MAX / SPEED_MAX_CAP : 0;
    const shownMax = Math.round(SPEED_MAX);
-   const hue2 = 60 - Math.max(0, Math.min(1, capPct)) * 60;
-   speedBarInner.style.background = `hsl(${hue2}, 95%, 55%)`;
    hudSpeedText.textContent = hudSpeedText.textContent || `Speed: 0/${shownMax}`;
 }
 
