@@ -59,6 +59,7 @@ resize();
 let myId = null;
 let myName = "";
 let hitRadius = 22;
+let isDead = false;
 let ws = null;
 let joined = false;
 let mouseX = window.innerWidth / 2;
@@ -122,7 +123,7 @@ function updateSpeedFromMouse() {
     const hue = 60 - pct * 60;
     speedBarInner.style.background = `hsl(${hue}, 95%, 55%)`;
     hudSpeedText.textContent = `Speed: ${Math.round(clamped)}/${SPEED_MAX}`;
-    if (joined && (tNow - joinTimeMs) > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
+    if (!isDead && joined && ws && ws.readyState === WebSocket.OPEN && (tNow - joinTimeMs) > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
         showDeathScreen("Speed");
     }
 }
@@ -139,6 +140,9 @@ function stopConnection() {
     ws = null;
 }
 function showDeathScreen(killedBy) {
+    if (isDead)
+        return;
+    isDead = true;
     stopConnection();
     hideRoomText();
     hudBottom.style.display = "none";
@@ -149,6 +153,7 @@ function showDeathScreen(killedBy) {
 function resetToMenu() {
     stopConnection();
     hideRoomText();
+    isDead = false;
     joined = false;
     myId = null;
     myMaxHp = null;
@@ -172,6 +177,7 @@ nameInput.focus();
 function startGame() {
     if (joined)
         return;
+    isDead = false;
     joined = true;
     const clean = nameInput.value.trim().slice(0, 18);
     myName = clean.length ? clean : "Player";

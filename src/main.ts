@@ -75,6 +75,7 @@ type PlayerState = {
 let myId: string | null = null;
 let myName = "";
 let hitRadius = 22;
+let isDead = false;
 
 let ws: WebSocket | null = null;
 let joined = false;
@@ -162,9 +163,11 @@ function updateSpeedFromMouse() {
 
    hudSpeedText.textContent = `Speed: ${Math.round(clamped)}/${SPEED_MAX}`;
 
-   if (joined && (tNow - joinTimeMs) > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
-      showDeathScreen("Speed");
+   if (!isDead && joined && ws && ws.readyState === WebSocket.OPEN && (tNow - joinTimeMs) > SPEED_GRACE_MS && smoothSpeed >= SPEED_MAX) {
+   showDeathScreen("Speed");
    }
+
+
 }
 
 let lastKillerName: string | null = null;
@@ -179,8 +182,10 @@ function stopConnection() {
 }
 
 function showDeathScreen(killedBy: string) {
-   stopConnection();
+   if (isDead) return;
+   isDead = true;
 
+   stopConnection();
    hideRoomText();
 
    hudBottom.style.display = "none";
@@ -190,11 +195,13 @@ function showDeathScreen(killedBy: string) {
    deathScreen.style.display = "flex";
 }
 
+
 function resetToMenu() {
    stopConnection();
 
    hideRoomText();
 
+   isDead = false;
    joined = false;
    myId = null;
    myMaxHp = null;
@@ -224,6 +231,7 @@ nameInput.focus();
 
 function startGame() {
    if (joined) return;
+   isDead = false;
    joined = true;
 
    const clean = nameInput.value.trim().slice(0, 18);
