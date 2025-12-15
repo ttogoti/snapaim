@@ -184,7 +184,7 @@
     .barOuter {
       position: relative;
       width: 100%;
-      height: 16px;
+      height: 18px;
       border-radius: 10px;
       overflow: hidden;
       background: rgba(0,0,0,0.10);
@@ -200,6 +200,24 @@
       width: 0%;
       border-radius: 10px;
       background: #7c7c7c;
+    }
+
+    .barText {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 13px;
+      color: rgba(255,255,255,0.98);
+      user-select: none;
+      pointer-events: none;
+      text-shadow:
+        2px 0 rgba(0,0,0,0.92),
+        -2px 0 rgba(0,0,0,0.92),
+        0 2px rgba(0,0,0,0.92),
+        0 -2px rgba(0,0,0,0.92);
     }
 
     #deathScreen, #tutorialScreen, #socialsScreen {
@@ -407,7 +425,7 @@
         <button id="tutorialClose" class="closeBtn btnOutlinedText">✕</button>
       </div>
       <div id="tutorialBody">
-        <div id="tutorialText">The faster you go, the more damage you can do. Click to apply damage at your speed. Do not go over the speed limit, or you get punished. Your mouse is your character.</div>
+        <div id="tutorialText">The faster you go, the more damage you can do. Click to apply damage at your speed. If you move too fast, you get punished. Your mouse is your character.</div>
       </div>
     </div>
   </div>
@@ -427,7 +445,8 @@
 
   <div id="hudBottom">
     <div class="barOuter">
-      <div id="killsBarInner" class="barInner"></div>
+      <div id="levelBarInner" class="barInner"></div>
+      <div id="levelBarText" class="barText">Level: 1</div>
     </div>
   </div>
 

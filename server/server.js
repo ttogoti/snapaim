@@ -13,7 +13,7 @@ const HIT_RADIUS = 22;
 const SPEED_MAX = 2000;
 const SPEED_PENALTY_DMG = 4999;
 const SPEED_PENALTY_COOLDOWN_MS = 2000;
-const MAXHP_STEP = 5000;
+const LEVEL_HP_STEP = 5000;
 function now() {
     return Date.now();
 }
@@ -45,6 +45,14 @@ function leaderboardTop10() {
     arr.sort((a, b) => b.damage - a.damage);
     return arr.slice(0, 10);
 }
+function levelUp(p) {
+    const pct = p.maxHp > 0 ? p.hp / p.maxHp : 1;
+    p.level += 1;
+    p.maxHp += LEVEL_HP_STEP;
+    p.hp = Math.max(1, Math.floor(pct * p.maxHp));
+    p.killsInLevel = 0;
+    p.killsNeeded = Math.max(1, Math.floor(p.killsNeeded * 1.5));
+}
 function applyDamage(attacker, target, dmg) {
     const before = target.hp;
     const applied = Math.max(0, Math.min(before, Math.floor(dmg)));
@@ -55,10 +63,9 @@ function applyDamage(attacker, target, dmg) {
     broadcast({ t: "hit", from: attacker.id, to: target.id, hp: target.hp, maxHp: target.maxHp });
     if (target.hp <= 0) {
         attacker.kills += 1;
-        if (attacker.kills % 3 === 0) {
-            const pct = attacker.maxHp > 0 ? attacker.hp / attacker.maxHp : 1;
-            attacker.maxHp += MAXHP_STEP;
-            attacker.hp = Math.max(1, Math.round(pct * attacker.maxHp));
+        attacker.killsInLevel += 1;
+        if (attacker.killsInLevel >= attacker.killsNeeded) {
+            levelUp(attacker);
             broadcast({ t: "hit", from: attacker.id, to: attacker.id, hp: attacker.hp, maxHp: attacker.maxHp });
         }
         const byName = (attacker.name && attacker.name.trim().length) ? attacker.name : id4(attacker.id);
@@ -88,7 +95,10 @@ wss.on("connection", (ws) => {
         y: 0,
         hp: 10000,
         maxHp: 10000,
+        level: 1,
         kills: 0,
+        killsInLevel: 0,
+        killsNeeded: 3,
         damage: 0,
         lastMoveT: t,
         lastMoveX: 0,
@@ -187,7 +197,10 @@ setInterval(() => {
         y: p.y,
         hp: p.hp,
         maxHp: p.maxHp,
+        level: p.level,
         kills: p.kills,
+        killsInLevel: p.killsInLevel,
+        killsNeeded: p.killsNeeded,
         damage: p.damage
     }));
     broadcast({

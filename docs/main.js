@@ -5,7 +5,8 @@ const menu = document.getElementById("menu");
 const nameInput = document.getElementById("nameInput");
 const playBtn = document.getElementById("playBtn");
 const hudBottom = document.getElementById("hudBottom");
-const killsBarInner = document.getElementById("killsBarInner");
+const levelBarInner = document.getElementById("levelBarInner");
+const levelBarText = document.getElementById("levelBarText");
 const deathScreen = document.getElementById("deathScreen");
 const deathBig = document.getElementById("deathBig");
 const continueBtn = document.getElementById("continueBtn");
@@ -83,7 +84,6 @@ function wsSend(payload) {
     ws.send(JSON.stringify(out));
 }
 let SPEED_MAX = 2000;
-const SPEED_MAX_CAP = 3500;
 let lastSpeedT = performance.now();
 let lastSpeedX = mouseX;
 let lastSpeedY = mouseY;
@@ -166,7 +166,8 @@ function resetToMenu() {
     hudBottom.style.display = "none";
     leaderboard.style.display = "none";
     menu.style.display = "flex";
-    killsBarInner.style.width = "0%";
+    levelBarInner.style.width = "0%";
+    levelBarText.textContent = "Level: 1";
     nameInput.value = "";
     nameInput.focus();
 }
@@ -403,40 +404,87 @@ function hpHueBlueYellowRed(pct) {
         return 0 + (60 - 0) * u;
     }
 }
-function drawHpBarAbove(x, y, p, isSelf) {
+function speedHueYellowToRed(pct) {
+    const t = Math.max(0, Math.min(1, pct));
+    return 60 - 60 * t;
+}
+function drawMouseBars() {
+    if (!joined || isDead)
+        return;
+    if (!myId)
+        return;
+    const me = players.get(myId);
+    if (!me)
+        return;
+    const maxHp = maxHpForPlayer(me);
+    const hpPct = Math.max(0, Math.min(1, me.hp / maxHp));
+    const spPct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
+    const w = 120;
+    const h = 8;
+    const r = 5;
+    const hpX = mouseX - w / 2;
+    const hpY = mouseY - hitRadius - 28;
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    roundedRect(hpX, hpY, w, h, r);
+    ctx.fill();
+    const hpW = w * hpPct;
+    if (hpW > 0) {
+        const hh = hpHueBlueYellowRed(hpPct);
+        ctx.fillStyle = `hsl(${hh}, 95%, 55%)`;
+        roundedRect(hpX, hpY, hpW, h, r);
+        ctx.fill();
+    }
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "rgba(55,55,55,0.95)";
+    roundedRect(hpX, hpY, w, h, r);
+    ctx.stroke();
+    const spX = mouseX - w / 2;
+    const spY = mouseY - hitRadius - 16;
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    roundedRect(spX, spY, w, h, r);
+    ctx.fill();
+    const spW = w * spPct;
+    if (spW > 0) {
+        const sh = speedHueYellowToRed(spPct);
+        ctx.fillStyle = `hsl(${sh}, 95%, 55%)`;
+        roundedRect(spX, spY, spW, h, r);
+        ctx.fill();
+    }
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "rgba(55,55,55,0.95)";
+    roundedRect(spX, spY, w, h, r);
+    ctx.stroke();
+    ctx.restore();
+}
+function drawOtherHpBar(x, y, p) {
     const maxHp = maxHpForPlayer(p);
     const pct = Math.max(0, Math.min(1, p.hp / maxHp));
     const w = 70;
     const h = 12;
+    const r = 6;
     const bx = x - w / 2;
     const by = y - hitRadius - 24;
     ctx.save();
     ctx.fillStyle = "rgba(0,0,0,0.20)";
-    roundedRect(bx, by, w, h, 6);
+    roundedRect(bx, by, w, h, r);
     ctx.fill();
-    let hue = 120;
-    if (isSelf) {
-        hue = hpHueBlueYellowRed(pct);
-        ctx.fillStyle = `hsl(${hue}, 95%, 55%)`;
-    }
-    else {
-        let c = "#3ddc84";
-        if (pct > 0.6)
-            c = "#3ddc84";
-        else if (pct > 0.3)
-            c = "#f5c542";
-        else
-            c = "#ff4d4d";
-        ctx.fillStyle = c;
-    }
+    let c = "#3ddc84";
+    if (pct > 0.6)
+        c = "#3ddc84";
+    else if (pct > 0.3)
+        c = "#f5c542";
+    else
+        c = "#ff4d4d";
     const fw = w * pct;
     if (fw > 0) {
-        roundedRect(bx, by, fw, h, 6);
+        ctx.fillStyle = c;
+        roundedRect(bx, by, fw, h, r);
         ctx.fill();
     }
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(55,55,55,0.95)";
-    roundedRect(bx, by, w, h, 6);
+    roundedRect(bx, by, w, h, r);
     ctx.stroke();
     ctx.restore();
 }
@@ -476,38 +524,22 @@ function drawOtherLabel(x, y, p) {
     ctx.fillText(suffix, startX + numW + sufW / 2, line2Y);
     ctx.restore();
 }
-function updateKillsBar() {
+function updateLevelBar() {
     if (!joined || !myId) {
-        killsBarInner.style.width = "0%";
-        killsBarInner.style.background = "#7c7c7c";
+        levelBarInner.style.width = "0%";
+        levelBarText.textContent = "Level: 1";
         return;
     }
     const me = players.get(myId);
     if (!me)
         return;
-    const k = typeof me.kills === "number" ? me.kills : 0;
-    const mod = ((k % 3) + 3) % 3;
-    const pct = mod / 3;
-    killsBarInner.style.width = `${pct * 100}%`;
-    killsBarInner.style.background = "linear-gradient(to bottom, #7fb6ff 0%, #7fb6ff 66.666%, #2f76ff 66.666%, #2f76ff 100%)";
-    killsBarInner.style.borderRadius = "10px";
-}
-function drawSelf() {
-    if (!joined || isDead)
-        return;
-    const speedPct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
-    const hue = 240 - speedPct * 240;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(mouseX, mouseY, hitRadius, 0, Math.PI * 2);
-    ctx.fillStyle = `hsl(${hue}, 95%, 55%)`;
-    ctx.fill();
-    ctx.restore();
-    if (myId) {
-        const me = players.get(myId);
-        if (me)
-            drawHpBarAbove(mouseX, mouseY, me, true);
-    }
+    const level = typeof me.level === "number" && isFinite(me.level) ? me.level : 1;
+    const inLvl = typeof me.killsInLevel === "number" && isFinite(me.killsInLevel) ? me.killsInLevel : 0;
+    const need = typeof me.killsNeeded === "number" && isFinite(me.killsNeeded) && me.killsNeeded > 0 ? me.killsNeeded : 3;
+    const pct = Math.max(0, Math.min(1, inLvl / need));
+    levelBarInner.style.width = `${pct * 100}%`;
+    levelBarInner.style.background = "linear-gradient(to bottom, #7fb6ff 0%, #7fb6ff 66.666%, #2f76ff 66.666%, #2f76ff 100%)";
+    levelBarText.textContent = `Level: ${level}`;
 }
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -528,11 +560,11 @@ function loop() {
         ctx.fillStyle = "rgba(90,240,150,0.95)";
         ctx.fill();
         ctx.restore();
-        drawHpBarAbove(x, y, p, false);
+        drawOtherHpBar(x, y, p);
         drawOtherLabel(x, y, p);
     }
-    drawSelf();
-    updateKillsBar();
+    drawMouseBars();
+    updateLevelBar();
     requestAnimationFrame(loop);
 }
 hideRoomText();
