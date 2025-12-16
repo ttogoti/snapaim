@@ -32,7 +32,7 @@
 				display: block;
 			}
 			#bg { z-index: 0; }
-			#c  { z-index: 1; }
+			#c { z-index: 1; }
 
 			:root {
 				--menuW: min(640px, calc(100vw - 120px));
@@ -87,7 +87,7 @@
 
 			.uiBtnBig { height: 48px; font-size: 22px; }
 			.uiBtnMed { height: 40px; font-size: 16px; letter-spacing: 0.25px; }
-			.uiBtnSm  { height: 38px; font-size: 16px; letter-spacing: 0.25px; }
+			.uiBtnSm { height: 38px; font-size: 16px; letter-spacing: 0.25px; }
 
 			.btnGray {
 				background: linear-gradient(
@@ -167,10 +167,222 @@
 				font-weight: 600;
 			}
 
+			#hudBottom {
+				position: fixed;
+				left: 50%;
+				bottom: 18px;
+				transform: translateX(-50%);
+				width: min(980px, calc(100vw - 64px));
+				display: none;
+				flex-direction: column;
+				align-items: center;
+				gap: 10px;
+				pointer-events: none;
+				z-index: 3;
+			}
+
+			#speedHud {
+				position: fixed;
+				left: 14px;
+				top: 50%;
+				transform: translateY(-50%);
+				display: none;
+				pointer-events: none;
+				z-index: 3;
+			}
+
+			.barOuter {
+				position: relative;
+				width: 100%;
+				height: 20px;
+				border-radius: 12px;
+				overflow: hidden;
+				background: rgba(0,0,0,0.10);
+				border: 2px solid rgba(0,0,0,0.20);
+			}
+
+			.barOuter::after {
+				content: "";
+				position: absolute;
+				inset: 0;
+				z-index: 3;
+				pointer-events: none;
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.70),
+					inset 0 -1px 0 rgba(0,0,0,0.18),
+					inset 0 -3px 0 rgba(0,0,0,0.20);
+			}
+
+			.barFill {
+				position: absolute;
+				inset: 0;
+				width: 0%;
+				height: 100%;
+				border-radius: 12px;
+				z-index: 1;
+				overflow: hidden;
+			}
+
+			.barFill .shadeBottom {
+				position: absolute;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				height: 33.333%;
+				z-index: 2;
+				opacity: 0.35;
+				background: rgba(0,0,0,1);
+				mix-blend-mode: multiply;
+				pointer-events: none;
+			}
+
+			.barText {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: 800;
+				font-size: 13px;
+				line-height: 1;
+				color: rgba(255,255,255,0.98);
+				user-select: none;
+				pointer-events: none;
+				z-index: 4;
+				text-shadow:
+					1px 0 rgba(0,0,0,0.85),
+					-1px 0 rgba(0,0,0,0.85),
+					0 1px rgba(0,0,0,0.85),
+					0 -1px rgba(0,0,0,0.85);
+				-webkit-font-smoothing: antialiased;
+				-moz-osx-font-smoothing: grayscale;
+				text-rendering: geometricPrecision;
+			}
+
+			#levelRow {
+				width: min(520px, 100%);
+			}
+
+			#hpRow {
+				width: 100%;
+			}
+
+			.vOuter {
+				position: relative;
+				width: 18px;
+				height: 280px;
+				border-radius: 12px;
+				overflow: hidden;
+				background: rgba(0,0,0,0.10);
+				border: 2px solid rgba(0,0,0,0.20);
+			}
+
+			.vOuter::after {
+				content: "";
+				position: absolute;
+				inset: 0;
+				z-index: 3;
+				pointer-events: none;
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.70),
+					inset 0 -1px 0 rgba(0,0,0,0.18),
+					inset 0 -3px 0 rgba(0,0,0,0.20);
+			}
+
+			.vFill {
+				position: absolute;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				height: 0%;
+				border-radius: 12px;
+				z-index: 1;
+				overflow: hidden;
+			}
+
+			.vFill .shadeTop {
+				position: absolute;
+				left: 0;
+				right: 0;
+				top: 0;
+				height: 33.333%;
+				z-index: 2;
+				opacity: 0.35;
+				background: rgba(0,0,0,1);
+				mix-blend-mode: multiply;
+				pointer-events: none;
+			}
+
+			.vFill .shadeRight {
+				position: absolute;
+				top: 0;
+				bottom: 0;
+				right: 0;
+				width: 33.333%;
+				z-index: 2;
+				opacity: 0.22;
+				background: rgba(0,0,0,1);
+				mix-blend-mode: multiply;
+				pointer-events: none;
+			}
+
+			#leaderboard {
+				position: fixed;
+				top: 14px;
+				right: 14px;
+				z-index: 3;
+				width: 260px;
+				pointer-events: none;
+				background: rgba(255,255,255,0.30);
+				backdrop-filter: blur(6px);
+				border: 2px solid rgba(0,0,0,0.15);
+				border-radius: 10px;
+				overflow: hidden;
+			}
+
+			#leaderboardHeader {
+				padding: 10px 12px;
+				font-weight: 800;
+				font-size: 14px;
+				color: rgba(0,0,0,0.88);
+				background: rgba(255,255,255,0.25);
+				border-bottom: 1px solid rgba(0,0,0,0.10);
+			}
+
+			#leaderboardBody {
+				padding: 8px 10px 10px 10px;
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+			}
+
+			.lbRow {
+				display: flex;
+				justify-content: space-between;
+				gap: 10px;
+				font-size: 12px;
+				font-weight: 700;
+				color: rgba(0,0,0,0.85);
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			.lbName {
+				overflow: hidden;
+				text-overflow: ellipsis;
+				color: rgba(30, 160, 70, 0.95);
+			}
+
+			.lbDmg {
+				flex: 0 0 auto;
+				font-variant-numeric: tabular-nums;
+			}
+
 			#deathScreen, #tutorialScreen, #socialsScreen {
 				position: fixed;
 				inset: 0;
-				z-index: 6;
+				z-index: 4;
 				display: none;
 				align-items: center;
 				justify-content: center;
@@ -289,222 +501,6 @@
 				align-items: center;
 				justify-content: center;
 			}
-
-			#leaderboard {
-				position: fixed;
-				top: 14px;
-				right: 14px;
-				z-index: 5;
-				width: 260px;
-				pointer-events: none;
-				background: rgba(255,255,255,0.22);
-				border: 2px solid rgba(0,0,0,0.18);
-				border-radius: 10px;
-				overflow: hidden;
-				backdrop-filter: blur(6px);
-				-webkit-backdrop-filter: blur(6px);
-				box-shadow:
-					inset 0 1px 0 rgba(255,255,255,0.55),
-					inset 0 -1px 0 rgba(0,0,0,0.14),
-					inset 0 -3px 0 rgba(0,0,0,0.16);
-			}
-
-			#leaderboardHeader {
-				padding: 10px 12px;
-				font-weight: 800;
-				font-size: 14px;
-				color: rgba(0,0,0,0.88);
-				background: rgba(255,255,255,0.25);
-				border-bottom: 1px solid rgba(0,0,0,0.12);
-			}
-
-			#leaderboardBody {
-				padding: 8px 10px 10px 10px;
-				display: flex;
-				flex-direction: column;
-				gap: 6px;
-			}
-
-			.lbRow {
-				display: flex;
-				justify-content: space-between;
-				gap: 10px;
-				font-size: 12px;
-				font-weight: 700;
-				color: rgba(0,0,0,0.85);
-				white-space: nowrap;
-				overflow: hidden;
-				text-overflow: ellipsis;
-			}
-
-			.lbName {
-				overflow: hidden;
-				text-overflow: ellipsis;
-			}
-
-			.lbName.me {
-				color: rgba(0, 170, 70, 0.95);
-				font-weight: 900;
-			}
-
-			.lbDmg {
-				flex: 0 0 auto;
-				font-variant-numeric: tabular-nums;
-			}
-
-			#hudBottom {
-				position: fixed;
-				left: 50%;
-				bottom: 22px;
-				transform: translateX(-50%);
-				width: min(860px, calc(100vw - 48px));
-				display: none;
-				flex-direction: column;
-				align-items: center;
-				gap: 10px;
-				pointer-events: none;
-				z-index: 5;
-			}
-
-			#hudLeft {
-				position: fixed;
-				left: 14px;
-				top: 50%;
-				transform: translateY(-50%);
-				display: none;
-				pointer-events: none;
-				z-index: 5;
-			}
-
-			.hudStack {
-				display: flex;
-				flex-direction: column;
-				gap: 10px;
-				align-items: center;
-			}
-
-			.barOuter {
-				position: relative;
-				overflow: hidden;
-				border-radius: 12px;
-				background: rgba(0,0,0,0.10);
-			}
-
-			.barOuter.h {
-				width: 100%;
-				height: 22px;
-			}
-
-			.barOuter.v {
-				width: 18px;
-				height: 360px;
-				border-radius: 14px;
-			}
-
-			.barFillClip {
-				position: absolute;
-				inset: 0;
-				overflow: hidden;
-				border-radius: inherit;
-				z-index: 1;
-			}
-
-			.barFill {
-				position: absolute;
-				left: 0;
-				top: 0;
-				height: 100%;
-				width: 0%;
-				background: linear-gradient(
-					to bottom,
-					var(--fillLight, #7fb6ff) 0%,
-					var(--fillLight, #7fb6ff) 66.666%,
-					var(--fillDark, #2f76ff) 66.666%,
-					var(--fillDark, #2f76ff) 100%
-				);
-				border-radius: inherit;
-				z-index: 1;
-			}
-
-			.barOuter.v .barFill {
-				bottom: 0;
-				top: auto;
-				width: 100%;
-				height: 0%;
-				background: linear-gradient(
-					to bottom,
-					var(--fillDark, #7c7c7c) 0%,
-					var(--fillDark, #7c7c7c) 33.333%,
-					var(--fillLight, #b9b9b9) 33.333%,
-					var(--fillLight, #b9b9b9) 100%
-				);
-			}
-
-			.fillShade {
-				position: absolute;
-				inset: 0;
-				border-radius: inherit;
-				pointer-events: none;
-				z-index: 2;
-			}
-
-			.fillShade.bottom {
-				top: auto;
-				height: 33.333%;
-				background: rgba(0,0,0,0.18);
-			}
-
-			.fillShade.top {
-				bottom: auto;
-				height: 33.333%;
-				background: rgba(0,0,0,0.16);
-			}
-
-			.fillShade.right {
-				left: auto;
-				width: 33.333%;
-				background: rgba(0,0,0,0.14);
-			}
-
-			.barOverlay {
-				position: absolute;
-				inset: 0;
-				border-radius: inherit;
-				pointer-events: none;
-				z-index: 5;
-				box-shadow:
-					inset 0 1px 0 rgba(255,255,255,0.70),
-					inset 0 -1px 0 rgba(0,0,0,0.18),
-					inset 0 -3px 0 rgba(0,0,0,0.20);
-				border: 2px solid rgba(0,0,0,0.20);
-			}
-
-			.barText {
-				position: absolute;
-				inset: 0;
-				display: flex;
-				align-items: center;
-				justify-content: center;
-				font-weight: 900;
-				font-size: 13px;
-				line-height: 1;
-				color: rgba(255, 255, 255, 0.98);
-				user-select: none;
-				pointer-events: none;
-				z-index: 6;
-				text-shadow:
-					1px 0 rgba(0, 0, 0, 0.85),
-					-1px 0 rgba(0, 0, 0, 0.85),
-					0 1px rgba(0, 0, 0, 0.85),
-					0 -1px rgba(0, 0, 0, 0.85);
-				-webkit-font-smoothing: antialiased;
-				-moz-osx-font-smoothing: grayscale;
-				text-rendering: geometricPrecision;
-			}
-
-			#hpBarOuter { width: min(980px, calc(100vw - 48px)); }
-			#levelBarOuter { width: min(420px, calc(100vw - 48px)); height: 18px; }
-
 		</style>
 	</head>
 
@@ -517,36 +513,28 @@
 			<div id="leaderboardBody"></div>
 		</div>
 
-		<div id="hudLeft" style="display:none;">
-			<div class="hudStack">
-				<div id="speedBarOuter" class="barOuter v" style="--fillLight:#ffd84a;--fillDark:#e24b2b;">
-					<div class="barFillClip">
-						<div id="speedBarInner" class="barFill"></div>
-						<div class="fillShade top"></div>
-						<div class="fillShade right"></div>
-					</div>
-					<div class="barOverlay"></div>
+		<div id="speedHud" style="display:none;">
+			<div class="vOuter">
+				<div id="speedFill" class="vFill">
+					<div class="shadeTop"></div>
+					<div class="shadeRight"></div>
 				</div>
 			</div>
 		</div>
 
 		<div id="hudBottom">
-			<div id="hpBarOuter" class="barOuter h" style="--fillLight:#66ff66;--fillDark:#2fbf2f;">
-				<div class="barFillClip">
-					<div id="hpBarInner" class="barFill"></div>
-					<div class="fillShade bottom"></div>
+			<div id="hpRow" class="barOuter">
+				<div id="hpFill" class="barFill">
+					<div class="shadeBottom"></div>
 				</div>
-				<div class="barOverlay"></div>
-				<div id="hpBarText" class="barText">HP: 0/0</div>
+				<div id="hpText" class="barText">HP: 0/0</div>
 			</div>
 
-			<div id="levelBarOuter" class="barOuter h" style="--fillLight:#7fb6ff;--fillDark:#2f76ff;">
-				<div class="barFillClip">
-					<div id="levelBarInner" class="barFill"></div>
-					<div class="fillShade bottom"></div>
+			<div id="levelRow" class="barOuter">
+				<div id="levelFill" class="barFill">
+					<div class="shadeBottom"></div>
 				</div>
-				<div class="barOverlay"></div>
-				<div id="levelBarText" class="barText">Level: 1</div>
+				<div id="levelText" class="barText">Level: 1</div>
 			</div>
 		</div>
 
@@ -668,6 +656,6 @@
 			drawGrid();
 		</script>
 
-		<script type="module" src="./main.js"></script>
+		<script defer src="./main.js"></script>
 	</body>
 </html>
