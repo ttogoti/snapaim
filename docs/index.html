@@ -1,651 +1,789 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>snapaim.org</title>
-    <meta name="theme-color" content="#0b0f1a" />
-    <style>
-      :root{
-        --bg0:#070914;
-        --bg1:#0b1030;
-        --glass: rgba(255,255,255,.06);
-        --glass2: rgba(255,255,255,.10);
-        --stroke: rgba(255,255,255,.12);
-        --stroke2: rgba(255,255,255,.18);
-        --text: rgba(255,255,255,.92);
-        --muted: rgba(255,255,255,.70);
-        --muted2: rgba(255,255,255,.55);
-        --shadow: 0 18px 70px rgba(0,0,0,.55);
-        --shadow2: 0 10px 40px rgba(0,0,0,.35);
-        --radius: 18px;
-        --radius2: 26px;
-        --ease: cubic-bezier(.2,.9,.2,1);
-        --accent1:#7c5cff;
-        --accent2:#00d4ff;
-        --accent3:#ff3d9a;
-        --good:#25f7a7;
-        --bad:#ff5a7a;
-      }
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>SnapAim</title>
 
-      *{box-sizing:border-box}
-      html,body{height:100%}
-      body{
-        margin:0;
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-        color:var(--text);
-        background:
-          radial-gradient(1200px 900px at 18% 12%, rgba(124,92,255,.28), transparent 60%),
-          radial-gradient(1100px 850px at 82% 16%, rgba(0,212,255,.22), transparent 60%),
-          radial-gradient(900px 700px at 60% 90%, rgba(255,61,154,.12), transparent 60%),
-          linear-gradient(180deg, var(--bg0), var(--bg1));
-        overflow:hidden;
-      }
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700;800&display=swap" rel="stylesheet">
 
-      .grain{
-        position:fixed; inset:0;
-        pointer-events:none;
-        opacity:.08;
-        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.6'/%3E%3C/svg%3E");
-        background-size:180px 180px;
-        mix-blend-mode:overlay;
-      }
+		<style>
+			* {
+				box-sizing: border-box;
+				margin: 0;
+				padding: 0;
+				font-family: "Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+			}
 
-      .wrap{height:100%; display:grid; place-items:center; padding:24px}
-      .shell{
-        width:min(980px, 96vw);
-        height:min(640px, 92vh);
-        border-radius: var(--radius2);
-        background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
-        border:1px solid var(--stroke);
-        box-shadow: var(--shadow);
-        position:relative;
-        overflow:hidden;
-      }
+			html, body {
+				height: 100%;
+				width: 100%;
+				overflow: hidden;
+				background: #ffffff;
+			}
 
-      .topGlow{
-        position:absolute; inset:-120px -120px auto -120px;
-        height:280px;
-        background: radial-gradient(closest-side, rgba(124,92,255,.34), transparent 70%);
-        filter: blur(18px);
-        opacity:.9;
-      }
+			#bg, #c {
+				position: fixed;
+				inset: 0;
+				width: 100vw;
+				height: 100vh;
+				display: block;
+			}
+			#bg { z-index: 0; }
+			#c { z-index: 1; }
 
-      .content{
-        position:absolute; inset:0;
-        display:grid;
-        grid-template-columns: 1.1fr .9fr;
-        gap: 18px;
-        padding: 22px;
-      }
+			:root {
+				--menuW: min(720px, calc(100vw - 120px));
+				--uiRadius: 8px;
+				--outline: rgba(0,0,0,0.92);
+				--outlineSize: 2.25px;
+				--borderW: 3.75px;
+				--bevelTop: rgba(255,255,255,0.65);
+				--bevelMid: rgba(0,0,0,0.25);
+				--bevelDeep: rgba(0,0,0,0.35);
+			}
 
-      .pane{
-        border-radius: var(--radius);
-        background: rgba(0,0,0,.18);
-        border:1px solid var(--stroke);
-        box-shadow: var(--shadow2);
-        overflow:hidden;
-        position:relative;
-      }
+			.btnOutlinedText {
+				color: rgba(255,255,255,0.98);
+				text-shadow:
+					var(--outlineSize) 0 var(--outline),
+					calc(var(--outlineSize) * -1) 0 var(--outline),
+					0 var(--outlineSize) var(--outline),
+					0 calc(var(--outlineSize) * -1) var(--outline),
+					calc(var(--outlineSize) * 0.9) calc(var(--outlineSize) * 0.9) var(--outline),
+					calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * 0.9) var(--outline),
+					calc(var(--outlineSize) * 0.9) calc(var(--outlineSize) * -0.9) var(--outline),
+					calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * -0.9) var(--outline);
+			}
 
-      .paneInner{height:100%; padding:18px; display:flex; flex-direction:column; gap:14px}
-      .brand{
-        display:flex; align-items:center; justify-content:space-between;
-        gap:12px;
-      }
-      .logo{
-        display:flex; align-items:center; gap:12px;
-        user-select:none;
-      }
-      .mark{
-        width:38px; height:38px; border-radius:14px;
-        background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.22), rgba(255,255,255,.04));
-        border:1px solid var(--stroke2);
-        display:grid; place-items:center;
-        box-shadow: 0 12px 40px rgba(0,0,0,.35);
-        position:relative;
-        overflow:hidden;
-      }
-      .mark:before{
-        content:"";
-        position:absolute; inset:-12px;
-        background: conic-gradient(from 120deg, rgba(124,92,255,.95), rgba(0,212,255,.9), rgba(255,61,154,.85), rgba(124,92,255,.95));
-        opacity:.55;
-        filter: blur(12px);
-      }
-      .mark svg{position:relative}
-      .title{
-        display:flex; flex-direction:column; line-height:1.05;
-      }
-      .title h1{
-        margin:0;
-        font-size: 18px;
-        letter-spacing:.6px;
-        font-weight: 750;
-      }
-      .title .sub{
-        margin-top:4px;
-        font-size:12.5px;
-        color:var(--muted2);
-      }
+			.uiBtn {
+				width: 360px;
+				height: 48px;
+				align-self: center;
+				border-radius: var(--uiRadius);
+				border: var(--borderW) solid rgba(0,0,0,0.22);
+				cursor: pointer;
+				user-select: none;
+				font-weight: 800;
+				letter-spacing: 0.3px;
+				box-shadow:
+					inset 0 1px 0 var(--bevelTop),
+					inset 0 -1px 0 var(--bevelMid),
+					inset 0 -3px 0 var(--bevelDeep);
+				transform: translateY(0);
+				filter: brightness(1);
+			}
 
-      .chipRow{display:flex; gap:10px; flex-wrap:wrap}
-      .chip{
-        display:inline-flex; align-items:center; gap:8px;
-        padding:8px 10px;
-        border-radius: 999px;
-        background: rgba(255,255,255,.06);
-        border:1px solid var(--stroke);
-        color:var(--muted);
-        font-size:12.5px;
-        user-select:none;
-      }
-      .dot{
-        width:8px; height:8px; border-radius:999px;
-        background: rgba(255,255,255,.25);
-        box-shadow: 0 0 0 4px rgba(255,255,255,.05);
-      }
-      .dot.good{background: rgba(37,247,167,.9); box-shadow: 0 0 0 4px rgba(37,247,167,.14)}
-      .dot.bad{background: rgba(255,90,122,.92); box-shadow: 0 0 0 4px rgba(255,90,122,.14)}
+			.uiBtn:active {
+				box-shadow:
+					inset 0 -1px 0 var(--bevelTop),
+					inset 0 1px 0 var(--bevelMid),
+					inset 0 3px 0 var(--bevelDeep);
+				transform: translateY(1px);
+				filter: brightness(0.97);
+			}
 
-      .card{
-        flex:1;
-        border-radius: var(--radius);
-        background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
-        border:1px solid var(--stroke);
-        padding:16px;
-        position:relative;
-        overflow:hidden;
-      }
-      .card:before{
-        content:"";
-        position:absolute; inset:-60px -60px auto -60px;
-        height:160px;
-        background: radial-gradient(closest-side, rgba(0,212,255,.18), transparent 70%);
-        filter: blur(18px);
-      }
-      .card h2{
-        margin:0 0 6px 0;
-        font-size: 16px;
-        letter-spacing:.4px;
-      }
-      .card p{
-        margin:0 0 14px 0;
-        color:var(--muted2);
-        font-size: 13px;
-        line-height:1.45;
-      }
+			.uiBtnBig { height: 52px; font-size: 22px; }
+			.uiBtnMed { height: 42px; font-size: 16px; letter-spacing: 0.25px; }
+			.uiBtnSm  { height: 38px; font-size: 16px; letter-spacing: 0.25px; }
 
-      .fieldLabel{
-        font-size:12px;
-        color:var(--muted2);
-        margin-bottom:6px;
-      }
-      .field{
-        display:flex; gap:10px;
-      }
-      input[type="text"], select{
-        width:100%;
-        border-radius: 14px;
-        border:1px solid var(--stroke);
-        background: rgba(0,0,0,.20);
-        color:var(--text);
-        padding: 12px 12px;
-        outline:none;
-        transition: transform .15s var(--ease), border-color .15s var(--ease), background .15s var(--ease);
-        font-size:14px;
-      }
-      select{cursor:pointer}
-      input[type="text"]:focus, select:focus{
-        border-color: rgba(124,92,255,.55);
-        background: rgba(0,0,0,.26);
-      }
+			.btnGray {
+				background: linear-gradient(
+					to bottom,
+					#b9b9b9 0%,
+					#b9b9b9 66.666%,
+					#7c7c7c 66.666%,
+					#7c7c7c 100%
+				);
+			}
 
-      .btnRow{display:flex; gap:10px; margin-top:12px}
-      .btn{
-        border:1px solid var(--stroke);
-        background: rgba(255,255,255,.06);
-        color:var(--text);
-        border-radius: 14px;
-        padding: 12px 14px;
-        cursor:pointer;
-        user-select:none;
-        font-weight:650;
-        letter-spacing:.2px;
-        transition: transform .12s var(--ease), background .12s var(--ease), border-color .12s var(--ease), filter .12s var(--ease);
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        gap:10px;
-        width:100%;
-      }
-      .btn:hover{transform: translateY(-1px); background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.20)}
-      .btn:active{transform: translateY(1px) scale(.99); filter: brightness(.95)}
-      .btn.primary{
-        border-color: rgba(124,92,255,.55);
-        background: linear-gradient(180deg, rgba(124,92,255,.35), rgba(124,92,255,.16));
-        box-shadow: 0 18px 60px rgba(124,92,255,.15);
-      }
-      .btn.primary:hover{border-color: rgba(124,92,255,.75)}
-      .btn .spark{
-        width:10px; height:10px; border-radius:999px;
-        background: rgba(0,212,255,.85);
-        box-shadow: 0 0 0 5px rgba(0,212,255,.12);
-      }
+			.btnBlue {
+				background: linear-gradient(
+					to bottom,
+					#7fb6ff 0%,
+					#7fb6ff 66.666%,
+					#2f76ff 66.666%,
+					#2f76ff 100%
+				);
+			}
 
-      .right{
-        display:flex; flex-direction:column;
-        gap: 14px;
-      }
+			.btnTeal {
+				background: linear-gradient(
+					to bottom,
+					#7be7e7 0%,
+					#7be7e7 66.666%,
+					#33c0c0 66.666%,
+					#33c0c0 100%
+				);
+			}
 
-      .gamePane{
-        flex:1;
-        border-radius: var(--radius);
-        background: rgba(0,0,0,.22);
-        border:1px solid var(--stroke);
-        overflow:hidden;
-        position:relative;
-      }
+			#menu {
+				position: fixed;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				z-index: 2;
+			}
 
-      canvas{display:block; width:100%; height:100%}
+			#menuInner {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 14px;
+				width: var(--menuW);
+			}
 
-      .hud{
-        position:absolute; inset:0;
-        pointer-events:none;
-      }
-      .hudTop{
-        position:absolute; left:14px; right:14px; top:12px;
-        display:flex; justify-content:space-between; gap:10px;
-        pointer-events:none;
-      }
-      .pill{
-        pointer-events:none;
-        display:inline-flex; align-items:center; gap:8px;
-        padding:8px 10px;
-        border-radius: 999px;
-        background: rgba(0,0,0,.25);
-        border:1px solid rgba(255,255,255,.12);
-        backdrop-filter: blur(10px);
-        color: rgba(255,255,255,.88);
-        font-size:12.5px;
-        box-shadow: 0 10px 40px rgba(0,0,0,.25);
-      }
-      .kbd{
-        font-size:11px;
-        padding:2px 6px;
-        border-radius: 8px;
-        border:1px solid rgba(255,255,255,.14);
-        background: rgba(255,255,255,.06);
-        color: rgba(255,255,255,.85);
-      }
+			#titleWrap {
+				width: 100%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				margin-bottom: 4px;
+			}
 
-      .centerMsg{
-        position:absolute; left:50%; top:50%;
-        transform: translate(-50%,-50%);
-        text-align:center;
-        width:min(420px, 88%);
-        pointer-events:none;
-      }
-      .centerMsg .big{
-        font-size: 18px;
-        font-weight: 800;
-        letter-spacing:.4px;
-        margin:0 0 6px 0;
-      }
-      .centerMsg .small{
-        margin:0;
-        font-size: 13px;
-        color: var(--muted2);
-        line-height:1.45;
-      }
+			#siteTitle {
+				font-size: 58px;
+				font-weight: 900;
+				letter-spacing: 0.5px;
+				color: rgba(255,255,255,0.98);
+				text-shadow:
+					3px 0 rgba(0,0,0,0.85),
+					-3px 0 rgba(0,0,0,0.85),
+					0 3px rgba(0,0,0,0.85),
+					0 -3px rgba(0,0,0,0.85),
+					2px 2px rgba(0,0,0,0.65),
+					-2px 2px rgba(0,0,0,0.65),
+					2px -2px rgba(0,0,0,0.65),
+					-2px -2px rgba(0,0,0,0.65);
+			}
 
-      .socialBtn{
-        position:absolute; left:16px; bottom:16px;
-        width:52px; height:52px;
-        border-radius: 14px;
-        border:1px solid rgba(255,255,255,.14);
-        background: rgba(0,0,0,.25);
-        backdrop-filter: blur(12px);
-        box-shadow: 0 12px 40px rgba(0,0,0,.35);
-        display:grid; place-items:center;
-        cursor:pointer;
-        transition: transform .12s var(--ease), background .12s var(--ease), border-color .12s var(--ease);
-        z-index: 8;
-      }
-      .socialBtn:hover{transform: translateY(-1px); border-color: rgba(255,255,255,.20); background: rgba(0,0,0,.30)}
-      .socialBtn:active{transform: translateY(1px) scale(.99)}
-      .socialIcons{
-        display:flex; gap:8px; align-items:center; justify-content:center;
-        opacity:.92;
-      }
-      .socialIcons svg{width:16px; height:16px; fill:white; opacity:.92}
+			#menuPanel {
+				width: 100%;
+				background: rgba(0,0,0,0.35);
+				border-radius: 12px;
+				padding: 18px 18px 16px 18px;
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.25),
+					0 18px 40px rgba(0,0,0,0.18);
+				backdrop-filter: blur(6px);
+				display: flex;
+				flex-direction: column;
+				gap: 14px;
+			}
 
-      .settingsBtn{
-        position:absolute; right:16px; bottom:16px;
-        width:52px; height:52px;
-        border-radius: 14px;
-        border:1px solid rgba(255,255,255,.14);
-        background: rgba(0,0,0,.25);
-        backdrop-filter: blur(12px);
-        box-shadow: 0 12px 40px rgba(0,0,0,.35);
-        display:grid; place-items:center;
-        cursor:pointer;
-        transition: transform .12s var(--ease), background .12s var(--ease), border-color .12s var(--ease);
-        z-index: 8;
-      }
-      .settingsBtn:hover{transform: translateY(-1px); border-color: rgba(255,255,255,.20); background: rgba(0,0,0,.30)}
-      .settingsBtn:active{transform: translateY(1px) scale(.99)}
-      .settingsBtn svg{width:18px; height:18px; fill:white; opacity:.9}
+			#topRow {
+				display: flex;
+				gap: 14px;
+				align-items: center;
+				justify-content: center;
+				width: 100%;
+			}
 
-      .drawer{
-        position:absolute; right:14px; bottom:76px;
-        width:min(360px, calc(100% - 28px));
-        border-radius: 18px;
-        border:1px solid rgba(255,255,255,.14);
-        background: rgba(10,12,24,.62);
-        backdrop-filter: blur(16px);
-        box-shadow: 0 18px 70px rgba(0,0,0,.55);
-        overflow:hidden;
-        transform: translateY(10px) scale(.985);
-        opacity:0;
-        pointer-events:none;
-        transition: transform .18s var(--ease), opacity .18s var(--ease);
-        z-index: 9;
-      }
-      .drawer.open{
-        opacity:1;
-        pointer-events:auto;
-        transform: translateY(0) scale(1);
-      }
-      .drawerHead{
-        padding:12px 14px;
-        display:flex; align-items:center; justify-content:space-between;
-        border-bottom:1px solid rgba(255,255,255,.10);
-      }
-      .drawerHead .t{
-        font-weight:800;
-        letter-spacing:.3px;
-        font-size:13px;
-      }
-      .drawerHead .x{
-        width:34px; height:34px;
-        border-radius: 12px;
-        border:1px solid rgba(255,255,255,.14);
-        background: rgba(255,255,255,.06);
-        cursor:pointer;
-        display:grid; place-items:center;
-        transition: transform .12s var(--ease), background .12s var(--ease);
-      }
-      .drawerHead .x:hover{transform: translateY(-1px); background: rgba(255,255,255,.09)}
-      .drawerHead .x:active{transform: translateY(1px)}
-      .drawerBody{padding:12px 14px; display:flex; flex-direction:column; gap:12px}
-      .row{
-        display:grid;
-        grid-template-columns: 1fr 120px;
-        gap: 10px;
-        align-items:center;
-      }
-      .row .name{
-        font-size:12.5px;
-        color: rgba(255,255,255,.82);
-      }
-      .row .desc{
-        font-size:11.5px;
-        color: rgba(255,255,255,.55);
-        margin-top:2px;
-      }
-      input[type="range"]{
-        width:100%;
-        accent-color: rgba(124,92,255,.85);
-      }
-      .val{
-        font-variant-numeric: tabular-nums;
-        font-size:12px;
-        color: rgba(255,255,255,.75);
-        text-align:right;
-      }
+			.dropWrap {
+				flex: 0 1 420px;
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+			}
 
-      .toast{
-        position:absolute;
-        left:50%; bottom:16px;
-        transform: translateX(-50%) translateY(14px);
-        opacity:0;
-        padding:10px 12px;
-        border-radius: 999px;
-        border:1px solid rgba(255,255,255,.14);
-        background: rgba(0,0,0,.28);
-        backdrop-filter: blur(12px);
-        color: rgba(255,255,255,.86);
-        font-size: 12.5px;
-        display:flex; gap:10px; align-items:center;
-        box-shadow: 0 12px 40px rgba(0,0,0,.35);
-        transition: transform .18s var(--ease), opacity .18s var(--ease);
-        z-index: 10;
-        pointer-events:none;
-      }
-      .toast.show{
-        opacity:1;
-        transform: translateX(-50%) translateY(0);
-      }
-      .toast .badge{
-        width:9px; height:9px; border-radius: 999px;
-        background: rgba(37,247,167,.9);
-        box-shadow: 0 0 0 5px rgba(37,247,167,.12);
-      }
+			.dropLabel {
+				font-weight: 900;
+				font-size: 16px;
+				color: rgba(255,255,255,0.96);
+				text-shadow:
+					2px 0 rgba(0,0,0,0.85),
+					-2px 0 rgba(0,0,0,0.85),
+					0 2px rgba(0,0,0,0.85),
+					0 -2px rgba(0,0,0,0.85);
+			}
 
-      @media (max-width: 860px){
-        .content{grid-template-columns: 1fr; }
-        .shell{height:min(740px, 94vh)}
-      }
-    </style>
-  </head>
-  <body>
-    <div class="grain"></div>
+			.selectBox {
+				width: 100%;
+				height: 54px;
+				border-radius: 10px;
+				border: var(--borderW) solid rgba(0,0,0,0.22);
+				background: linear-gradient(
+					to bottom,
+					#7be7e7 0%,
+					#7be7e7 66.666%,
+					#33c0c0 66.666%,
+					#33c0c0 100%
+				);
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.70),
+					inset 0 -1px 0 rgba(0,0,0,0.18),
+					inset 0 -3px 0 rgba(0,0,0,0.20);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				position: relative;
+				overflow: hidden;
+			}
 
-    <div class="wrap">
-      <div class="shell" id="shell">
-        <div class="topGlow"></div>
+			#regionSelect {
+				appearance: none;
+				-webkit-appearance: none;
+				-moz-appearance: none;
+				width: 100%;
+				height: 100%;
+				border: none;
+				outline: none;
+				background: transparent;
+				font-weight: 900;
+				font-size: 20px;
+				padding: 0 52px 0 16px;
+				color: rgba(255,255,255,0.98);
+				cursor: pointer;
+				text-shadow:
+					2px 0 rgba(0,0,0,0.85),
+					-2px 0 rgba(0,0,0,0.85),
+					0 2px rgba(0,0,0,0.85),
+					0 -2px rgba(0,0,0,0.85);
+			}
 
-        <div class="content">
-          <div class="pane">
-            <div class="paneInner">
-              <div class="brand">
-                <div class="logo">
-                  <div class="mark" aria-hidden="true">
-                    <svg width="22" height="22" viewBox="0 0 24 24">
-                      <path fill="white" opacity="0.92" d="M12 2c5.523 0 10 4.477 10 10s-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2Zm0 3.2A6.8 6.8 0 1 0 18.8 12 6.808 6.808 0 0 0 12 5.2Zm0 2.6A4.2 4.2 0 1 1 7.8 12 4.206 4.206 0 0 1 12 7.8Zm0 2.3a1.9 1.9 0 1 0 1.9 1.9 1.903 1.903 0 0 0-1.9-1.9Z"/>
-                    </svg>
-                  </div>
-                  <div class="title">
-                    <h1>snapaim.org</h1>
-                    <div class="sub">indie aim trainer • quick sessions • clean feel</div>
-                  </div>
-                </div>
-              </div>
+			.selectChevron {
+				position: absolute;
+				right: 16px;
+				top: 50%;
+				transform: translateY(-50%);
+				width: 18px;
+				height: 18px;
+				pointer-events: none;
+				filter: drop-shadow(0 2px 0 rgba(0,0,0,0.35));
+			}
 
-              <div class="chipRow">
-                <div class="chip"><span class="dot" id="wsDot"></span><span id="wsText">Connecting…</span></div>
-                <div class="chip"><span class="dot" id="pingDot"></span><span id="pingText">Ping —</span></div>
-                <div class="chip"><span class="dot good"></span><span>Press <span class="kbd">Space</span> to start</span></div>
-              </div>
+			#nameInput {
+				width: 100%;
+				height: 72px;
+				background: rgba(255,255,255,0.95);
+				color: #000000;
+				border: var(--borderW) solid rgba(0,0,0,0.22);
+				border-radius: 10px;
+				outline: none;
+				font-size: 26px;
+				font-weight: 800;
+				text-align: left;
+				padding: 0 18px;
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.75),
+					inset 0 -1px 0 rgba(0,0,0,0.18),
+					inset 0 -3px 0 rgba(0,0,0,0.22);
+			}
 
-              <div class="card">
-                <h2>Enter & play</h2>
-                <p>Pick a nickname and region. No modes—just pure aim. Everything else is tweakable in settings.</p>
+			#nameInput::placeholder {
+				color: #7a7a7a;
+				font-weight: 700;
+			}
 
-                <div class="fieldLabel">Nickname</div>
-                <div class="field">
-                  <input id="nickname" type="text" maxlength="16" placeholder="e.g. younus" autocomplete="off" />
-                </div>
+			#playBtn {
+				width: 360px;
+			}
 
-                <div style="height:10px"></div>
+			#socialsFab {
+				position: fixed;
+				left: 14px;
+				bottom: 14px;
+				width: 56px;
+				height: 56px;
+				border-radius: 10px;
+				border: var(--borderW) solid rgba(0,0,0,0.22);
+				background: linear-gradient(
+					to bottom,
+					#7fb6ff 0%,
+					#7fb6ff 66.666%,
+					#2f76ff 66.666%,
+					#2f76ff 100%
+				);
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.70),
+					inset 0 -1px 0 rgba(0,0,0,0.18),
+					inset 0 -3px 0 rgba(0,0,0,0.20),
+					0 10px 26px rgba(0,0,0,0.18);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: 6px;
+				z-index: 5;
+				cursor: pointer;
+				user-select: none;
+			}
 
-                <div class="fieldLabel">Region</div>
-                <div class="field">
-                  <select id="region">
-                    <option value="eu">EU</option>
-                    <option value="na">NA</option>
-                    <option value="me">ME</option>
-                    <option value="asia">ASIA</option>
-                    <option value="oce">OCE</option>
-                    <option value="sa">SA</option>
-                  </select>
-                </div>
+			#socialsFab:active {
+				transform: translateY(1px);
+				box-shadow:
+					inset 0 -1px 0 rgba(255,255,255,0.70),
+					inset 0 1px 0 rgba(0,0,0,0.18),
+					inset 0 3px 0 rgba(0,0,0,0.20),
+					0 8px 22px rgba(0,0,0,0.18);
+			}
 
-                <div class="btnRow">
-                  <button class="btn primary" id="playBtn">
-                    <span class="spark"></span>
-                    <span>Play</span>
-                  </button>
-                  <button class="btn" id="practiceBtn">Practice</button>
-                </div>
+			.sIcon {
+				width: 20px;
+				height: 20px;
+				filter: drop-shadow(0 2px 0 rgba(0,0,0,0.45));
+			}
 
-                <div style="margin-top:12px; color:var(--muted2); font-size:12px;">
-                  Tip: Open settings (bottom-right) to tune sensitivity, shake, target size, and spawn rate.
-                </div>
-              </div>
-            </div>
-          </div>
+			#socialsPopup {
+				position: fixed;
+				left: 14px;
+				bottom: 78px;
+				z-index: 6;
+				display: none;
+				flex-direction: column;
+				gap: 10px;
+				pointer-events: auto;
+			}
 
-          <div class="right">
-            <div class="gamePane">
-              <canvas id="game"></canvas>
+			.sLink {
+				width: 200px;
+				height: 44px;
+				border-radius: 10px;
+				border: var(--borderW) solid rgba(0,0,0,0.22);
+				background: rgba(255,255,255,0.92);
+				display: flex;
+				align-items: center;
+				justify-content: flex-start;
+				gap: 10px;
+				padding: 0 12px;
+				text-decoration: none;
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.70),
+					inset 0 -1px 0 rgba(0,0,0,0.18),
+					inset 0 -3px 0 rgba(0,0,0,0.20),
+					0 12px 28px rgba(0,0,0,0.18);
+			}
 
-              <div class="hud">
-                <div class="hudTop">
-                  <div class="pill" id="leftPill">Score <span style="opacity:.85; font-variant-numeric: tabular-nums" id="score">0</span></div>
-                  <div class="pill" id="rightPill">
-                    <span>Acc <span style="opacity:.85; font-variant-numeric: tabular-nums" id="acc">0%</span></span>
-                    <span style="opacity:.35">•</span>
-                    <span>Streak <span style="opacity:.85; font-variant-numeric: tabular-nums" id="streak">0</span></span>
-                  </div>
-                </div>
+			.sLink span {
+				font-weight: 900;
+				color: rgba(0,0,0,0.85);
+			}
 
-                <div class="centerMsg" id="centerMsg">
-                  <p class="big">Ready.</p>
-                  <p class="small">Click to lock pointer. Hit targets fast. <span class="kbd">Esc</span> to unlock. <span class="kbd">Tab</span> to toggle settings.</p>
-                </div>
-              </div>
+			#hudBottom {
+				position: fixed;
+				left: 50%;
+				bottom: 26px;
+				transform: translateX(-50%);
+				width: min(860px, calc(100vw - 90px));
+				display: none;
+				flex-direction: column;
+				align-items: center;
+				gap: 10px;
+				pointer-events: none;
+				z-index: 3;
+			}
 
-              <button class="socialBtn" id="socialBtn" title="Socials">
-                <div class="socialIcons" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M18.9 2H22l-6.8 7.8L23 22h-6.2l-4.9-6.4L6.2 22H3l7.4-8.5L1 2h6.4l4.4 5.7L18.9 2Zm-1.1 18h1.7L6.1 3.9H4.3L17.8 20Z"/>
-                  </svg>
-                  <svg viewBox="0 0 24 24">
-                    <path d="M19.6 4.6A16.3 16.3 0 0 0 15.9 3c-.2.4-.4.9-.6 1.3-1.3-.2-2.6-.2-3.9 0-.2-.4-.4-.9-.6-1.3A16.1 16.1 0 0 0 7 4.6 16.9 16.9 0 0 0 3 17.9a16 16 0 0 0 4.9 2.5c.4-.5.7-1 .9-1.6-.5-.2-1-.4-1.4-.7l.3-.3c2.7 1.3 5.6 1.3 8.4 0l.3.3c-.5.3-.9.5-1.4.7.2.6.5 1.1.9 1.6A16 16 0 0 0 20.9 18 16.9 16.9 0 0 0 19.6 4.6ZM9.2 15.4c-.8 0-1.5-.7-1.5-1.6 0-.9.6-1.6 1.5-1.6.8 0 1.5.7 1.5 1.6 0 .9-.6 1.6-1.5 1.6Zm5.6 0c-.8 0-1.5-.7-1.5-1.6 0-.9.6-1.6 1.5-1.6s1.5.7 1.5 1.6c0 .9-.7 1.6-1.5 1.6Z"/>
-                  </svg>
-                </div>
-              </button>
+			#hudName {
+				font-weight: 900;
+				font-size: 44px;
+				color: rgba(255,255,255,0.98);
+				letter-spacing: 0.2px;
+				text-shadow:
+					3px 0 rgba(0,0,0,0.75),
+					-3px 0 rgba(0,0,0,0.75),
+					0 3px rgba(0,0,0,0.75),
+					0 -3px rgba(0,0,0,0.75),
+					2px 2px rgba(0,0,0,0.55),
+					-2px 2px rgba(0,0,0,0.55),
+					2px -2px rgba(0,0,0,0.55),
+					-2px -2px rgba(0,0,0,0.55);
+				margin-bottom: -4px;
+			}
 
-              <button class="settingsBtn" id="settingsBtn" title="Settings">
-                <svg viewBox="0 0 24 24">
-                  <path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.16 7.16 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.64.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.24.1.51.01.64-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.56ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/>
-                </svg>
-              </button>
+			.barOuter {
+				position: relative;
+				width: 100%;
+				height: 20px;
+				border-radius: 12px;
+				overflow: hidden;
+				background: rgba(0,0,0,0.10);
+				border: 2px solid rgba(0,0,0,0.20);
+			}
 
-              <div class="drawer" id="drawer">
-                <div class="drawerHead">
-                  <div class="t">Settings</div>
-                  <button class="x" id="closeDrawer" aria-label="Close">
-                    <svg width="14" height="14" viewBox="0 0 24 24">
-                      <path fill="white" opacity="0.9" d="M18.3 5.7 12 12l6.3 6.3-1.3 1.3L10.7 13.3 4.4 19.6 3.1 18.3 9.4 12 3.1 5.7 4.4 4.4l6.3 6.3 6.3-6.3 1.3 1.3Z"/>
-                    </svg>
-                  </button>
-                </div>
-                <div class="drawerBody">
-                  <div class="row">
-                    <div>
-                      <div class="name">Sensitivity</div>
-                      <div class="desc">Mouse feel / speed</div>
-                    </div>
-                    <div>
-                      <input id="sens" type="range" min="0.2" max="3" step="0.05" />
-                      <div class="val" id="sensVal"></div>
-                    </div>
-                  </div>
+			.barOuter::after {
+				content: "";
+				position: absolute;
+				inset: 0;
+				z-index: 5;
+				pointer-events: none;
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.70),
+					inset 0 -1px 0 rgba(0,0,0,0.18),
+					inset 0 -3px 0 rgba(0,0,0,0.20);
+			}
 
-                  <div class="row">
-                    <div>
-                      <div class="name">Target size</div>
-                      <div class="desc">Bigger = easier</div>
-                    </div>
-                    <div>
-                      <input id="tSize" type="range" min="10" max="56" step="1" />
-                      <div class="val" id="tSizeVal"></div>
-                    </div>
-                  </div>
+			.barFill {
+				position: absolute;
+				inset: 0;
+				width: 0%;
+				height: 100%;
+				border-radius: 12px;
+				z-index: 1;
+				overflow: hidden;
+			}
 
-                  <div class="row">
-                    <div>
-                      <div class="name">Spawn rate</div>
-                      <div class="desc">More = faster</div>
-                    </div>
-                    <div>
-                      <input id="spawn" type="range" min="0.45" max="1.6" step="0.01" />
-                      <div class="val" id="spawnVal"></div>
-                    </div>
-                  </div>
+			.barFill .shadeBottom {
+				position: absolute;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				height: 33.333%;
+				z-index: 2;
+				opacity: 0.35;
+				background: rgba(0,0,0,1);
+				mix-blend-mode: multiply;
+				pointer-events: none;
+			}
 
-                  <div class="row">
-                    <div>
-                      <div class="name">Shake</div>
-                      <div class="desc">Juice on hit</div>
-                    </div>
-                    <div>
-                      <input id="shake" type="range" min="0" max="1" step="0.02" />
-                      <div class="val" id="shakeVal"></div>
-                    </div>
-                  </div>
+			.barText {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: 900;
+				font-size: 14px;
+				line-height: 1;
+				color: rgba(255,255,255,0.98);
+				user-select: none;
+				pointer-events: none;
+				z-index: 10;
 
-                  <div class="row">
-                    <div>
-                      <div class="name">Sound</div>
-                      <div class="desc">Hit + click</div>
-                    </div>
-                    <div>
-                      <input id="sound" type="range" min="0" max="1" step="0.02" />
-                      <div class="val" id="soundVal"></div>
-                    </div>
-                  </div>
+				-webkit-font-smoothing: antialiased;
+				-moz-osx-font-smoothing: grayscale;
+				text-rendering: geometricPrecision;
 
-                  <button class="btn" id="resetBtn">Reset stats</button>
-                </div>
-              </div>
+				text-shadow:
+					1px 0 rgba(0,0,0,0.90),
+					-1px 0 rgba(0,0,0,0.90),
+					0 1px rgba(0,0,0,0.90),
+					0 -1px rgba(0,0,0,0.90),
+					0 2px 6px rgba(0,0,0,0.35);
+			}
 
-              <div class="toast" id="toast">
-                <span class="badge"></span>
-                <span id="toastText">Saved</span>
-              </div>
-            </div>
+			#levelRow {
+				width: min(520px, 100%);
+			}
 
-            <div class="pane" style="height: 122px;">
-              <div class="paneInner" style="justify-content:center;">
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-                  <div style="display:flex; flex-direction:column; gap:4px;">
-                    <div style="font-weight:800; letter-spacing:.3px;">Session</div>
-                    <div style="color:var(--muted2); font-size:12.5px;">
-                      <span id="sessionName">—</span> • <span id="sessionRegion">—</span>
-                    </div>
-                  </div>
-                  <div style="display:flex; gap:10px;">
-                    <button class="btn" id="stopBtn" style="width:auto; padding:10px 12px;">Stop</button>
-                    <button class="btn primary" id="restartBtn" style="width:auto; padding:10px 12px;">
-                      <span class="spark"></span><span>Restart</span>
-                    </button>
-                  </div>
-                </div>
-                <div style="color:var(--muted2); font-size:12px;">
-                  Press <span class="kbd">Space</span> to start/stop, <span class="kbd">Tab</span> settings, <span class="kbd">R</span> restart.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+			#hpRow {
+				width: 100%;
+			}
 
-      </div>
-    </div>
+			#speedHud {
+				position: fixed;
+				left: 14px;
+				top: 50%;
+				transform: translateY(-50%);
+				display: none;
+				pointer-events: none;
+				z-index: 3;
+			}
 
-    <script type="module" src="/main.js"></script>
-  </body>
+			.vOuter {
+				position: relative;
+				width: 18px;
+				height: 280px;
+				border-radius: 12px;
+				overflow: hidden;
+				background: rgba(0,0,0,0.10);
+				border: 2px solid rgba(0,0,0,0.20);
+			}
+
+			.vOuter::after {
+				content: "";
+				position: absolute;
+				inset: 0;
+				z-index: 5;
+				pointer-events: none;
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.70),
+					inset 0 -1px 0 rgba(0,0,0,0.18),
+					inset 0 -3px 0 rgba(0,0,0,0.20);
+			}
+
+			.vFill {
+				position: absolute;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				height: 0%;
+				border-radius: 12px;
+				z-index: 1;
+				overflow: hidden;
+			}
+
+			.vFill .shadeBottom {
+				position: absolute;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				height: 33.333%;
+				z-index: 2;
+				opacity: 0.35;
+				background: rgba(0,0,0,1);
+				mix-blend-mode: multiply;
+				pointer-events: none;
+			}
+
+			#leaderboard {
+				position: fixed;
+				top: 14px;
+				right: 14px;
+				z-index: 3;
+				width: 260px;
+				pointer-events: none;
+				background: rgba(255,255,255,0.18);
+				backdrop-filter: blur(6px);
+				border: 2px solid rgba(0,0,0,0.12);
+				border-radius: 10px;
+				overflow: hidden;
+				display: none;
+			}
+
+			#leaderboardHeader {
+				padding: 10px 12px;
+				font-weight: 900;
+				font-size: 14px;
+				color: rgba(0,0,0,0.88);
+				background: rgba(255,255,255,0.10);
+				border-bottom: 1px solid rgba(0,0,0,0.08);
+			}
+
+			#leaderboardBody {
+				padding: 8px 10px 10px 10px;
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+			}
+
+			.lbRow {
+				display: flex;
+				justify-content: space-between;
+				gap: 10px;
+				font-size: 12px;
+				font-weight: 900;
+				color: rgba(0,0,0,0.85);
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			.lbName {
+				overflow: hidden;
+				text-overflow: ellipsis;
+				color: rgba(30, 160, 70, 0.95);
+			}
+
+			.lbDmg {
+				flex: 0 0 auto;
+				font-variant-numeric: tabular-nums;
+			}
+
+			#deathScreen {
+				position: fixed;
+				inset: 0;
+				z-index: 10;
+				display: none;
+				align-items: center;
+				justify-content: center;
+				background: rgba(0,0,0,0.35);
+			}
+
+			#deathCard {
+				width: min(520px, calc(100vw - 80px));
+				background: rgba(255,255,255,0.92);
+				border: 1px solid rgba(0,0,0,0.18);
+				border-radius: var(--uiRadius);
+				display: flex;
+				flex-direction: column;
+				overflow: hidden;
+				padding: 18px;
+				align-items: center;
+				gap: 10px;
+			}
+
+			#deathSmall {
+				font-size: 18px;
+				font-weight: 900;
+				color: rgba(0,0,0,0.72);
+			}
+
+			#deathBig {
+				font-size: 34px;
+				font-weight: 900;
+				color: rgba(0,0,0,0.9);
+				margin-top: -6px;
+			}
+		</style>
+	</head>
+
+	<body>
+		<canvas id="bg"></canvas>
+		<canvas id="c"></canvas>
+
+		<div id="leaderboard">
+			<div id="leaderboardHeader">Damage</div>
+			<div id="leaderboardBody"></div>
+		</div>
+
+		<div id="speedHud">
+			<div class="vOuter">
+				<div id="speedFill" class="vFill">
+					<div class="shadeBottom"></div>
+				</div>
+			</div>
+		</div>
+
+		<div id="hudBottom">
+			<div id="hudName">Player</div>
+
+			<div id="hpRow" class="barOuter">
+				<div id="hpFill" class="barFill">
+					<div class="shadeBottom"></div>
+				</div>
+				<div id="hpText" class="barText">HP: 0/0</div>
+			</div>
+
+			<div id="levelRow" class="barOuter">
+				<div id="levelFill" class="barFill">
+					<div class="shadeBottom"></div>
+				</div>
+				<div id="levelText" class="barText">Level: 1</div>
+			</div>
+		</div>
+
+		<div id="menu">
+			<div id="menuInner">
+				<div id="titleWrap">
+					<div id="siteTitle">snapaim.org</div>
+				</div>
+
+				<div id="menuPanel">
+					<div id="topRow">
+						<div class="dropWrap">
+							<div class="dropLabel">Region</div>
+							<div class="selectBox">
+								<select id="regionSelect">
+									<option value="auto">Auto</option>
+									<option value="frankfurt">Frankfurt</option>
+									<option value="virginia">Virginia</option>
+									<option value="singapore">Singapore</option>
+								</select>
+								<svg class="selectChevron" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+									<path d="M6 9l6 6 6-6" stroke="rgba(0,0,0,0.75)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+								</svg>
+							</div>
+						</div>
+					</div>
+
+					<input id="nameInput" maxlength="18" placeholder="Good luck, ... (PUT USERNAME HERE)" />
+					<button id="playBtn" class="uiBtn uiBtnBig btnOutlinedText btnBlue">Play!</button>
+				</div>
+			</div>
+		</div>
+
+		<div id="socialsFab" title="Socials">
+			<svg class="sIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+				<path d="M19.5 6.5c-1.4-1-3.1-1.6-4.9-1.8l-.3.6c-1.5-.2-3.1-.2-4.6 0l-.3-.6c-1.8.2-3.5.8-4.9 1.8C2 10 1.6 13.2 1.8 16.4c1.7 1.3 3.5 2.1 5.5 2.6l.7-1.1c-.7-.3-1.4-.6-2-.9l.5-.4c3.6 1.6 7.5 1.6 11.1 0l.5.4c-.6.3-1.3.6-2 .9l.7 1.1c2-.5 3.8-1.3 5.5-2.6.2-3.2-.2-6.4-2.3-9.9Z" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+				<path d="M9 14.5c.6 0 1-.6 1-1.3S9.6 12 9 12s-1 .6-1 1.2.4 1.3 1 1.3Zm6 0c.6 0 1-.6 1-1.3S15.6 12 15 12s-1 .6-1 1.2.4 1.3 1 1.3Z" fill="white"/>
+			</svg>
+			<svg class="sIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+				<path d="M18.9 2H22l-6.8 7.8L23 22h-6.9l-5.4-6.7L4.8 22H2l7.3-8.4L1 2h7.1l4.9 6.1L18.9 2Z" fill="white"/>
+			</svg>
+		</div>
+
+		<div id="socialsPopup">
+			<a class="sLink" href="https://discord.gg/YE4VKhRn2X" target="_blank" rel="noopener noreferrer">
+				<svg class="sIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+					<path d="M19.5 6.5c-1.4-1-3.1-1.6-4.9-1.8l-.3.6c-1.5-.2-3.1-.2-4.6 0l-.3-.6c-1.8.2-3.5.8-4.9 1.8C2 10 1.6 13.2 1.8 16.4c1.7 1.3 3.5 2.1 5.5 2.6l.7-1.1c-.7-.3-1.4-.6-2-.9l.5-.4c3.6 1.6 7.5 1.6 11.1 0l.5.4c-.6.3-1.3.6-2 .9l.7 1.1c2-.5 3.8-1.3 5.5-2.6.2-3.2-.2-6.4-2.3-9.9Z" stroke="rgba(0,0,0,0.8)" stroke-width="2" stroke-linejoin="round"/>
+					<path d="M9 14.5c.6 0 1-.6 1-1.3S9.6 12 9 12s-1 .6-1 1.2.4 1.3 1 1.3Zm6 0c.6 0 1-.6 1-1.3S15.6 12 15 12s-1 .6-1 1.2.4 1.3 1 1.3Z" fill="rgba(0,0,0,0.8)"/>
+				</svg>
+				<span>Discord</span>
+			</a>
+			<a class="sLink" href="https://x.com/hexasixdice" target="_blank" rel="noopener noreferrer">
+				<svg class="sIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+					<path d="M18.9 2H22l-6.8 7.8L23 22h-6.9l-5.4-6.7L4.8 22H2l7.3-8.4L1 2h7.1l4.9 6.1L18.9 2Z" fill="rgba(0,0,0,0.85)"/>
+				</svg>
+				<span>X</span>
+			</a>
+		</div>
+
+		<div id="deathScreen">
+			<div id="deathCard">
+				<div id="deathSmall">You died to</div>
+				<div id="deathBig">Unknown</div>
+				<button id="continueBtn" class="uiBtn uiBtnSm btnOutlinedText btnGray">Continue</button>
+			</div>
+		</div>
+
+		<script>
+			const socialsFab = document.getElementById("socialsFab");
+			const socialsPopup = document.getElementById("socialsPopup");
+
+			function toggleSocials() {
+				if (!socialsPopup) return;
+				socialsPopup.style.display = socialsPopup.style.display === "flex" ? "none" : "flex";
+			}
+
+			if (socialsFab) socialsFab.addEventListener("click", toggleSocials);
+
+			window.addEventListener("pointerdown", (e) => {
+				if (!socialsPopup || !socialsFab) return;
+				const t = e.target;
+				if (socialsPopup.style.display !== "flex") return;
+				if (socialsPopup.contains(t) || socialsFab.contains(t)) return;
+				socialsPopup.style.display = "none";
+			});
+
+			const bg = document.getElementById("bg");
+			const bctx = bg ? bg.getContext("2d") : null;
+
+			function resizeBg() {
+				if (!bg) return;
+				bg.width = window.innerWidth;
+				bg.height = window.innerHeight;
+			}
+			window.addEventListener("resize", resizeBg);
+			resizeBg();
+
+			let ox = 0, oy = 0;
+			const spacing = 40;
+			const speed = 0.22;
+
+			function drawGrid() {
+				if (!bg || !bctx) return;
+
+				bctx.clearRect(0, 0, bg.width, bg.height);
+				bctx.fillStyle = "#ffffff";
+				bctx.fillRect(0, 0, bg.width, bg.height);
+				bctx.strokeStyle = "#e2e2e2";
+				bctx.lineWidth = 1;
+
+				ox -= speed;
+				oy -= speed;
+				if (ox <= -spacing) ox += spacing;
+				if (oy <= -spacing) oy += spacing;
+
+				for (let x = ox; x < bg.width; x += spacing) {
+					bctx.beginPath();
+					bctx.moveTo(x, 0);
+					bctx.lineTo(x, bg.height);
+					bctx.stroke();
+				}
+				for (let y = oy; y < bg.height; y += spacing) {
+					bctx.beginPath();
+					bctx.moveTo(0, y);
+					bctx.lineTo(bg.width, y);
+					bctx.stroke();
+				}
+
+				requestAnimationFrame(drawGrid);
+			}
+			drawGrid();
+		</script>
+
+		<script defer src="./main.js"></script>
+	</body>
 </html>
