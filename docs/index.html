@@ -300,18 +300,6 @@
 				overflow: hidden;
 			}
 
-			.vFill .shadeTop {
-				position: absolute;
-				left: 0;
-				right: 0;
-				top: 0;
-				height: 33.333%;
-				z-index: 2;
-				opacity: 0.35;
-				background: rgba(0,0,0,1);
-				mix-blend-mode: multiply;
-				pointer-events: none;
-			}
 
 			.vFill .shadeRight {
 				position: absolute;
@@ -320,11 +308,12 @@
 				right: 0;
 				width: 33.333%;
 				z-index: 2;
-				opacity: 0.22;
+				opacity: 0.35;
 				background: rgba(0,0,0,1);
 				mix-blend-mode: multiply;
 				pointer-events: none;
 			}
+
 
 			#leaderboard {
 				position: fixed;
@@ -516,7 +505,6 @@
 		<div id="speedHud" style="display:none;">
 			<div class="vOuter">
 				<div id="speedFill" class="vFill">
-					<div class="shadeTop"></div>
 					<div class="shadeRight"></div>
 				</div>
 			</div>
