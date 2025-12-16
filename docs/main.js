@@ -1,21 +1,23 @@
 "use strict";
 const canvas = document.getElementById("c");
-const ctx = canvas?.getContext("2d") ?? null;
+const ctx = canvas.getContext("2d");
 const menu = document.getElementById("menu");
 const nameInput = document.getElementById("nameInput");
 const playBtn = document.getElementById("playBtn");
+const regionSelect = document.getElementById("regionSelect");
 const hudBottom = document.getElementById("hudBottom");
-const speedHud = document.getElementById("speedHud");
+const hudName = document.getElementById("hudName");
 const hpFill = document.getElementById("hpFill");
 const hpText = document.getElementById("hpText");
 const levelFill = document.getElementById("levelFill");
 const levelText = document.getElementById("levelText");
+const speedHud = document.getElementById("speedHud");
 const speedFill = document.getElementById("speedFill");
+const leaderboard = document.getElementById("leaderboard");
+const leaderboardBody = document.getElementById("leaderboardBody");
 const deathScreen = document.getElementById("deathScreen");
 const deathBig = document.getElementById("deathBig");
 const continueBtn = document.getElementById("continueBtn");
-const leaderboard = document.getElementById("leaderboard");
-const leaderboardBody = document.getElementById("leaderboardBody");
 let roomText = document.getElementById("roomText");
 function ensureRoomText() {
     if (roomText)
@@ -26,7 +28,7 @@ function ensureRoomText() {
     d.style.top = "10px";
     d.style.left = "50%";
     d.style.transform = "translateX(-50%)";
-    d.style.fontWeight = "800";
+    d.style.fontWeight = "900";
     d.style.fontSize = "16px";
     d.style.color = "rgba(0,0,0,0.75)";
     d.style.zIndex = "9999";
@@ -54,8 +56,6 @@ function setRoomTextCount(count) {
     roomText.textContent = count === null ? "Connecting..." : `People in room: ${count}`;
 }
 function resize() {
-    if (!canvas)
-        return;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
@@ -72,9 +72,11 @@ let mouseY = window.innerHeight / 2;
 let myMaxHp = null;
 const players = new Map();
 const smooth = new Map();
-const WS_URL = location.hostname === "localhost"
-    ? "ws://localhost:8080"
-    : "wss://snapaim.onrender.com";
+function wsUrlForRegion(region) {
+    if (location.hostname === "localhost")
+        return "ws://localhost:8080";
+    return "wss://snapaim.onrender.com";
+}
 let heartbeat = null;
 function msgType(msg) {
     return msg?.t ?? msg?.type;
@@ -151,18 +153,12 @@ function showDeathScreen(killedBy) {
     isDead = true;
     stopConnection();
     hideRoomText();
-    if (hudBottom)
-        hudBottom.style.display = "none";
-    if (speedHud)
-        speedHud.style.display = "none";
-    if (leaderboard)
-        leaderboard.style.display = "none";
-    if (menu)
-        menu.style.display = "none";
-    if (deathBig)
-        deathBig.textContent = killedBy;
-    if (deathScreen)
-        deathScreen.style.display = "flex";
+    hudBottom.style.display = "none";
+    speedHud.style.display = "none";
+    leaderboard.style.display = "none";
+    menu.style.display = "none";
+    deathBig.textContent = killedBy;
+    deathScreen.style.display = "flex";
 }
 function resetToMenu() {
     stopConnection();
@@ -175,72 +171,50 @@ function resetToMenu() {
     players.clear();
     smooth.clear();
     resetSpeedSampler();
-    if (deathScreen)
-        deathScreen.style.display = "none";
-    if (hudBottom)
-        hudBottom.style.display = "none";
-    if (speedHud)
-        speedHud.style.display = "none";
-    if (leaderboard)
-        leaderboard.style.display = "none";
-    if (menu)
-        menu.style.display = "flex";
-    if (hpFill)
-        hpFill.style.width = "0%";
-    if (hpText)
-        hpText.textContent = "HP: 0/0";
-    if (levelFill)
-        levelFill.style.width = "0%";
-    if (levelText)
-        levelText.textContent = "Level: 1";
-    if (speedFill)
-        speedFill.style.height = "0%";
-    if (nameInput) {
-        nameInput.value = "";
-        nameInput.focus();
-    }
-}
-if (continueBtn) {
-    continueBtn.addEventListener("click", () => {
-        resetToMenu();
-    });
-}
-if (nameInput)
+    deathScreen.style.display = "none";
+    hudBottom.style.display = "none";
+    speedHud.style.display = "none";
+    leaderboard.style.display = "none";
+    menu.style.display = "flex";
+    hudName.textContent = "";
+    hpFill.style.width = "0%";
+    hpText.textContent = "HP: 0/0";
+    levelFill.style.width = "0%";
+    levelText.textContent = "Level: 1";
+    speedFill.style.height = "0%";
     nameInput.focus();
+}
+continueBtn.addEventListener("click", () => {
+    resetToMenu();
+});
+nameInput.focus();
 function startGame() {
     if (joined)
         return;
     joined = true;
-    const clean = (nameInput?.value ?? "").trim().slice(0, 18);
+    const clean = nameInput.value.trim().slice(0, 18);
     myName = clean.length ? clean : "Player";
     mouseX = window.innerWidth / 2;
     mouseY = window.innerHeight / 2;
     joinTimeMs = performance.now();
     resetSpeedSampler();
-    if (deathScreen)
-        deathScreen.style.display = "none";
-    if (menu)
-        menu.style.display = "none";
-    if (hudBottom)
-        hudBottom.style.display = "flex";
-    if (speedHud)
-        speedHud.style.display = "block";
-    if (leaderboard)
-        leaderboard.style.display = "block";
+    deathScreen.style.display = "none";
+    menu.style.display = "none";
+    hudBottom.style.display = "flex";
+    speedHud.style.display = "block";
+    leaderboard.style.display = "block";
+    hudName.textContent = myName;
     showRoomText();
     setRoomTextCount(null);
     connect();
 }
-if (playBtn)
-    playBtn.addEventListener("click", () => startGame());
-if (nameInput) {
-    nameInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            startGame();
-        }
-    });
-}
+playBtn.addEventListener("click", () => startGame());
+nameInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        startGame();
+    }
+});
 function pickRoomCount(msg, list) {
     const rc = typeof msg?.roomCount === "number" ? msg.roomCount :
         typeof msg?.count === "number" ? msg.count :
@@ -254,8 +228,6 @@ function pickRoomCount(msg, list) {
     return null;
 }
 function setLeaderboard(rows) {
-    if (!leaderboardBody)
-        return;
     if (!rows || !Array.isArray(rows)) {
         leaderboardBody.innerHTML = "";
         return;
@@ -277,7 +249,8 @@ function setLeaderboard(rows) {
     }
 }
 function connect() {
-    ws = new WebSocket(WS_URL);
+    const region = regionSelect ? String(regionSelect.value || "auto") : "auto";
+    ws = new WebSocket(wsUrlForRegion(region));
     ws.addEventListener("open", () => {
         heartbeat = window.setInterval(() => {
             wsSend({ t: "move", x: mouseX, y: mouseY });
@@ -339,6 +312,12 @@ function connect() {
                     else if (myMaxHp === null && typeof meFromList.hp === "number" && meFromList.hp > 0) {
                         myMaxHp = meFromList.hp;
                     }
+                    if (typeof meFromList.name === "string" && meFromList.name.trim().length) {
+                        hudName.textContent = meFromList.name;
+                    }
+                    else {
+                        hudName.textContent = myName;
+                    }
                 }
             }
             const alive = new Set(list.map((p) => p.id));
@@ -355,6 +334,7 @@ function connect() {
                     return;
                 }
             }
+            updateHudBars();
             return;
         }
         if (t === "hit") {
@@ -373,21 +353,18 @@ function connect() {
             if (myId && to === myId) {
                 const from = msg.from;
                 if (typeof from === "string") {
-                    if (from === "speed") {
+                    if (from === "speed")
                         lastKillerName = "Speed";
-                    }
                     else {
                         const killer = players.get(from);
-                        lastKillerName =
-                            (killer?.name && killer.name.trim().length)
-                                ? killer.name
-                                : from.slice(0, 4);
+                        lastKillerName = (killer?.name && killer.name.trim().length) ? killer.name : from.slice(0, 4);
                     }
                 }
                 if (typeof hp === "number" && hp <= 0) {
                     showDeathScreen(lastKillerName ?? "Unknown");
                 }
             }
+            updateHudBars();
             return;
         }
         if (t === "room") {
@@ -401,12 +378,11 @@ function connect() {
             clearInterval(heartbeat);
             heartbeat = null;
         }
-        if (joined && (!deathScreen || deathScreen.style.display !== "flex")) {
+        if (joined && deathScreen.style.display !== "flex")
             resetToMenu();
-        }
     });
     ws.addEventListener("error", () => {
-        if (joined && (!deathScreen || deathScreen.style.display !== "flex"))
+        if (joined && deathScreen.style.display !== "flex")
             resetToMenu();
     });
 }
@@ -434,61 +410,63 @@ function maxHpForPlayer(p) {
         return myMaxHp;
     return 1;
 }
-function hpHueGreenToRed(pct) {
+function hpColorGreenToRed(pct) {
     const t = Math.max(0, Math.min(1, pct));
-    return 120 * t;
+    const hue = 120 * t;
+    return `hsl(${hue}, 90%, 50%)`;
 }
-function speedHueYellowToRed(pct) {
+function speedColorYellowToRed(pct) {
     const t = Math.max(0, Math.min(1, pct));
-    return 60 - 60 * t;
+    const hue = 60 - 60 * t;
+    return `hsl(${hue}, 95%, 55%)`;
 }
 function updateHudBars() {
-    if (!joined || isDead || !myId) {
-        if (hpFill)
-            hpFill.style.width = "0%";
-        if (hpText)
-            hpText.textContent = "HP: 0/0";
-        if (levelFill)
-            levelFill.style.width = "0%";
-        if (levelText)
-            levelText.textContent = "Level: 1";
-        if (speedFill)
-            speedFill.style.height = "0%";
+    if (!joined || isDead || !myId)
         return;
-    }
     const me = players.get(myId);
     if (!me)
         return;
     const maxHp = maxHpForPlayer(me);
     const hpPct = Math.max(0, Math.min(1, me.hp / maxHp));
-    const spPct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
-    const hh = hpHueGreenToRed(hpPct);
-    if (hpFill) {
-        hpFill.style.width = `${hpPct * 100}%`;
-        hpFill.style.background = `hsl(${hh}, 85%, 55%)`;
-    }
-    if (hpText) {
-        hpText.textContent = `HP: ${Math.round(me.hp).toLocaleString()}/${Math.round(maxHp).toLocaleString()}`;
-    }
+    hpFill.style.width = `${hpPct * 100}%`;
+    hpFill.style.background = hpColorGreenToRed(hpPct);
+    hpText.textContent = `HP: ${Math.round(me.hp).toLocaleString()}/${Math.round(maxHp).toLocaleString()}`;
     const level = typeof me.level === "number" && isFinite(me.level) ? me.level : 1;
     const inLvl = typeof me.killsInLevel === "number" && isFinite(me.killsInLevel) ? me.killsInLevel : 0;
     const need = typeof me.killsNeeded === "number" && isFinite(me.killsNeeded) && me.killsNeeded > 0 ? me.killsNeeded : 3;
-    const lp = Math.max(0, Math.min(1, inLvl / need));
-    if (levelFill) {
-        levelFill.style.width = lp <= 0 ? "14px" : `${lp * 100}%`;
-        levelFill.style.background = "linear-gradient(to bottom, #7fb6ff 0%, #7fb6ff 66.666%, #2f76ff 66.666%, #2f76ff 100%)";
+    const lpct = Math.max(0, Math.min(1, inLvl / need));
+    levelFill.style.width = lpct <= 0 ? "14px" : `${lpct * 100}%`;
+    levelFill.style.background = "linear-gradient(to bottom, #7fb6ff 0%, #7fb6ff 66.666%, #2f76ff 66.666%, #2f76ff 100%)";
+    levelText.textContent = `Level: ${level}`;
+    const spPct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
+    speedFill.style.height = spPct <= 0 ? "10px" : `${spPct * 100}%`;
+    speedFill.style.background = speedColorYellowToRed(spPct);
+}
+function drawOtherHpBar(x, y, p) {
+    const maxHp = maxHpForPlayer(p);
+    const pct = Math.max(0, Math.min(1, p.hp / maxHp));
+    const w = 70;
+    const h = 12;
+    const r = 6;
+    const bx = x - w / 2;
+    const by = y - hitRadius - 24;
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.20)";
+    roundedRect(bx, by, w, h, r);
+    ctx.fill();
+    const fw = w * pct;
+    if (fw > 0) {
+        ctx.fillStyle = "#ff3b3b";
+        roundedRect(bx, by, fw, h, r);
+        ctx.fill();
     }
-    if (levelText)
-        levelText.textContent = `Level: ${level}`;
-    const sh = speedHueYellowToRed(spPct);
-    if (speedFill) {
-        speedFill.style.height = `${spPct * 100}%`;
-        speedFill.style.background = `linear-gradient(to bottom, hsl(${sh}, 95%, 52%) 0%, hsl(${sh}, 95%, 52%) 66.666%, hsl(${sh}, 95%, 40%) 66.666%, hsl(${sh}, 95%, 40%) 100%)`;
-    }
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(55,55,55,0.95)";
+    roundedRect(bx, by, w, h, r);
+    ctx.stroke();
+    ctx.restore();
 }
 function drawOtherLabel(x, y, p) {
-    if (!ctx)
-        return;
     const name = (p.name && p.name.trim().length) ? p.name : p.id.slice(0, 4);
     const kills = typeof p.kills === "number" ? p.kills : 0;
     const baseY = y + hitRadius + 14;
@@ -524,9 +502,17 @@ function drawOtherLabel(x, y, p) {
     ctx.fillText(suffix, startX + numW + sufW / 2, line2Y);
     ctx.restore();
 }
+function roundedRect(x, y, w, h, r) {
+    const rr = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+}
 function loop() {
-    if (!canvas || !ctx)
-        return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const SMOOTH = 0.18;
     for (const s of smooth.values()) {
@@ -542,9 +528,10 @@ function loop() {
         ctx.save();
         ctx.beginPath();
         ctx.arc(x, y, hitRadius, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(235,70,70,0.95)";
+        ctx.fillStyle = "rgba(255,70,70,0.95)";
         ctx.fill();
         ctx.restore();
+        drawOtherHpBar(x, y, p);
         drawOtherLabel(x, y, p);
     }
     updateHudBars();
