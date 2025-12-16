@@ -524,6 +524,35 @@ function drawOtherLabel(x, y, p) {
     ctx.fillText(suffix, startX + numW + sufW / 2, line2Y);
     ctx.restore();
 }
+function drawOtherHealthbar(x, y, p) {
+    if (!ctx)
+        return;
+    const maxHp = maxHpForPlayer(p);
+    const hpPct = Math.max(0, Math.min(1, p.hp / maxHp));
+    const hh = hpHueGreenToRed(hpPct);
+    const w = 78;
+    const h = 10;
+    const bx = x - w / 2;
+    const by = y - hitRadius - 20;
+    ctx.save();
+    ctx.fillStyle = "rgba(255,255,255,0.92)";
+    ctx.fillRect(bx - 1, by - 1, w + 2, h + 2);
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.fillRect(bx, by, w, h);
+    const fw = Math.max(0, w * hpPct);
+    if (fw > 0) {
+        ctx.fillStyle = `hsl(${hh}, 85%, 55%)`;
+        ctx.fillRect(bx, by, fw, h);
+        ctx.globalAlpha = 0.28;
+        ctx.fillStyle = "rgba(0,0,0,1)";
+        ctx.fillRect(bx, by + h * 0.66, fw, h * 0.34);
+        ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = "rgba(0,0,0,0.22)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx - 1, by - 1, w + 2, h + 2);
+    ctx.restore();
+}
 function loop() {
     if (!canvas || !ctx)
         return;
@@ -545,6 +574,7 @@ function loop() {
         ctx.fillStyle = "rgba(235,70,70,0.95)";
         ctx.fill();
         ctx.restore();
+        drawOtherHealthbar(x, y, p);
         drawOtherLabel(x, y, p);
     }
     updateHudBars();
