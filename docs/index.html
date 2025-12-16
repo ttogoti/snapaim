@@ -15,6 +15,9 @@
 				margin: 0;
 				padding: 0;
 				font-family: "Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+				-webkit-font-smoothing: antialiased;
+				-moz-osx-font-smoothing: grayscale;
+				text-rendering: geometricPrecision;
 			}
 
 			html, body {
@@ -38,11 +41,11 @@
 				--menuW: min(640px, calc(100vw - 120px));
 				--uiRadius: 6px;
 				--outline: rgba(0,0,0,0.92);
-				--outlineSize: 2.25px;
+				--outlineSize: 2.4px;
 				--borderW: 3.75px;
-				--bevelTop: rgba(255,255,255,0.65);
-				--bevelMid: rgba(0,0,0,0.25);
-				--bevelDeep: rgba(0,0,0,0.35);
+				--bevelTop: rgba(255,255,255,0.72);
+				--bevelMid: rgba(0,0,0,0.20);
+				--bevelDeep: rgba(0,0,0,0.40);
 			}
 
 			.btnOutlinedText {
@@ -56,6 +59,7 @@
 					calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * 0.9) var(--outline),
 					calc(var(--outlineSize) * 0.9) calc(var(--outlineSize) * -0.9) var(--outline),
 					calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * -0.9) var(--outline);
+				letter-spacing: 0.35px;
 			}
 
 			.uiBtn {
@@ -67,65 +71,74 @@
 				cursor: pointer;
 				user-select: none;
 				font-weight: 800;
-				letter-spacing: 0.3px;
+				letter-spacing: 0.35px;
 				box-shadow:
 					inset 0 1px 0 var(--bevelTop),
 					inset 0 -1px 0 var(--bevelMid),
-					inset 0 -3px 0 var(--bevelDeep);
+					inset 0 -3px 0 var(--bevelDeep),
+					0 2px 0 rgba(0,0,0,0.06);
 				transform: translateY(0);
-				filter: brightness(1);
+				filter: brightness(1) saturate(1);
+				transition: transform 80ms linear, filter 80ms linear;
+				will-change: transform, filter;
+			}
+
+			.uiBtn:hover {
+				filter: brightness(1.03) saturate(1.02);
+				transform: translateY(-0.5px);
 			}
 
 			.uiBtn:active {
 				box-shadow:
 					inset 0 -1px 0 var(--bevelTop),
 					inset 0 1px 0 var(--bevelMid),
-					inset 0 3px 0 var(--bevelDeep);
+					inset 0 3px 0 var(--bevelDeep),
+					0 1px 0 rgba(0,0,0,0.05);
 				transform: translateY(1px);
-				filter: brightness(0.97);
+				filter: brightness(0.98) saturate(0.98);
 			}
 
 			.uiBtnBig { height: 48px; font-size: 22px; }
-			.uiBtnMed { height: 40px; font-size: 16px; letter-spacing: 0.25px; }
-			.uiBtnSm { height: 38px; font-size: 16px; letter-spacing: 0.25px; }
+			.uiBtnMed { height: 40px; font-size: 16px; letter-spacing: 0.3px; }
+			.uiBtnSm { height: 38px; font-size: 16px; letter-spacing: 0.3px; }
 
 			.btnGray {
 				background: linear-gradient(
 					to bottom,
-					#b9b9b9 0%,
-					#b9b9b9 66.666%,
-					#7c7c7c 66.666%,
-					#7c7c7c 100%
+					#bebebe 0%,
+					#bebebe 66.666%,
+					#7b7b7b 66.666%,
+					#7b7b7b 100%
 				);
 			}
 
 			.btnGreen {
 				background: linear-gradient(
 					to bottom,
-					#7fe27f 0%,
-					#7fe27f 66.666%,
-					#4fbf4f 66.666%,
-					#4fbf4f 100%
+					#86e786 0%,
+					#86e786 66.666%,
+					#4dbb4d 66.666%,
+					#4dbb4d 100%
 				);
 			}
 
 			.btnBlue {
 				background: linear-gradient(
 					to bottom,
-					#7fb6ff 0%,
-					#7fb6ff 66.666%,
-					#2f76ff 66.666%,
-					#2f76ff 100%
+					#86bbff 0%,
+					#86bbff 66.666%,
+					#2d73ff 66.666%,
+					#2d73ff 100%
 				);
 			}
 
 			.btnPurple {
 				background: linear-gradient(
 					to bottom,
-					#b88bff 0%,
-					#b88bff 66.666%,
-					#7b3dff 66.666%,
-					#7b3dff 100%
+					#be98ff 0%,
+					#be98ff 66.666%,
+					#7a3bff 66.666%,
+					#7a3bff 100%
 				);
 			}
 
@@ -154,17 +167,29 @@
 				border-radius: var(--uiRadius);
 				outline: none;
 				font-size: 22px;
-				font-weight: 700;
+				font-weight: 800;
 				text-align: center;
 				box-shadow:
-					inset 0 1px 0 rgba(255,255,255,0.75),
+					inset 0 1px 0 rgba(255,255,255,0.80),
 					inset 0 -1px 0 rgba(0,0,0,0.18),
-					inset 0 -3px 0 rgba(0,0,0,0.22);
+					inset 0 -3px 0 rgba(0,0,0,0.22),
+					0 2px 0 rgba(0,0,0,0.05);
+				transition: filter 90ms linear, transform 90ms linear, box-shadow 90ms linear, border-color 90ms linear;
+			}
+
+			#nameInput:focus {
+				border-color: rgba(0,0,0,0.32);
+				filter: brightness(1.01);
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.82),
+					inset 0 -1px 0 rgba(0,0,0,0.16),
+					inset 0 -3px 0 rgba(0,0,0,0.20),
+					0 3px 0 rgba(0,0,0,0.06);
 			}
 
 			#nameInput::placeholder {
 				color: #7a7a7a;
-				font-weight: 600;
+				font-weight: 700;
 			}
 
 			#hudBottom {
@@ -197,7 +222,7 @@
 				height: 20px;
 				border-radius: 12px;
 				overflow: hidden;
-				background: rgba(0,0,0,0.10);
+				background: rgba(0,0,0,0.085);
 				border: 2px solid rgba(0,0,0,0.20);
 			}
 
@@ -208,9 +233,9 @@
 				z-index: 3;
 				pointer-events: none;
 				box-shadow:
-					inset 0 1px 0 rgba(255,255,255,0.70),
+					inset 0 1px 0 rgba(255,255,255,0.72),
 					inset 0 -1px 0 rgba(0,0,0,0.18),
-					inset 0 -3px 0 rgba(0,0,0,0.20);
+					inset 0 -3px 0 rgba(0,0,0,0.18);
 			}
 
 			.barFill {
@@ -221,6 +246,7 @@
 				border-radius: 12px;
 				z-index: 1;
 				overflow: hidden;
+				filter: saturate(1.02);
 			}
 
 			.barFill .shadeBottom {
@@ -230,12 +256,11 @@
 				bottom: 0;
 				height: 33.333%;
 				z-index: 2;
-				opacity: 0.35;
+				opacity: 0.34;
 				background: rgba(0,0,0,1);
 				mix-blend-mode: multiply;
 				pointer-events: none;
 			}
-
 
 			.barText {
 				position: absolute;
@@ -243,35 +268,22 @@
 				display: flex;
 				align-items: center;
 				justify-content: center;
-
 				font-family: "Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
 				font-weight: 900;
 				font-size: 12px;
 				line-height: 1;
-
 				color: rgba(255,255,255,0.98);
 				user-select: none;
 				pointer-events: none;
 				z-index: 10;
-
-				-webkit-font-smoothing: antialiased;
-				-moz-osx-font-smoothing: grayscale;
-				text-rendering: geometricPrecision;
-
 				text-shadow:
 					0 0 1px rgba(0,0,0,0.95),
-					0 0 2px rgba(0,0,0,0.85),
-					0 0 3px rgba(0,0,0,0.75),
+					0 0 2px rgba(0,0,0,0.82),
 					0 1px 3px rgba(0,0,0,0.55),
-					0 2px 6px rgba(0,0,0,0.35);
-
+					0 2px 6px rgba(0,0,0,0.30);
 				transform: translateZ(0);
 				backface-visibility: hidden;
 			}
-
-
-
-
 
 			#levelRow {
 				width: min(520px, 100%);
@@ -287,7 +299,7 @@
 				height: 280px;
 				border-radius: 12px;
 				overflow: hidden;
-				background: rgba(0,0,0,0.10);
+				background: rgba(0,0,0,0.085);
 				border: 2px solid rgba(0,0,0,0.20);
 			}
 
@@ -298,9 +310,9 @@
 				z-index: 3;
 				pointer-events: none;
 				box-shadow:
-					inset 0 1px 0 rgba(255,255,255,0.70),
+					inset 0 1px 0 rgba(255,255,255,0.72),
 					inset 0 -1px 0 rgba(0,0,0,0.18),
-					inset 0 -3px 0 rgba(0,0,0,0.20);
+					inset 0 -3px 0 rgba(0,0,0,0.18);
 			}
 
 			.vFill {
@@ -312,8 +324,8 @@
 				border-radius: 12px;
 				z-index: 1;
 				overflow: hidden;
+				filter: saturate(1.02);
 			}
-
 
 			.vFill .shadeRight {
 				position: absolute;
@@ -322,12 +334,11 @@
 				right: 0;
 				width: 33.333%;
 				z-index: 2;
-				opacity: 0.35;
+				opacity: 0.34;
 				background: rgba(0,0,0,1);
 				mix-blend-mode: multiply;
 				pointer-events: none;
 			}
-
 
 			#leaderboard {
 				position: fixed;
@@ -336,19 +347,20 @@
 				z-index: 3;
 				width: 260px;
 				pointer-events: none;
-				background: rgba(255,255,255,0.30);
-				backdrop-filter: blur(6px);
+				background: rgba(255,255,255,0.34);
+				backdrop-filter: blur(8px);
 				border: 2px solid rgba(0,0,0,0.15);
 				border-radius: 10px;
 				overflow: hidden;
+				box-shadow: 0 2px 0 rgba(0,0,0,0.05);
 			}
 
 			#leaderboardHeader {
 				padding: 10px 12px;
-				font-weight: 800;
+				font-weight: 900;
 				font-size: 14px;
 				color: rgba(0,0,0,0.88);
-				background: rgba(255,255,255,0.25);
+				background: rgba(255,255,255,0.28);
 				border-bottom: 1px solid rgba(0,0,0,0.10);
 			}
 
@@ -364,7 +376,7 @@
 				justify-content: space-between;
 				gap: 10px;
 				font-size: 12px;
-				font-weight: 700;
+				font-weight: 800;
 				color: rgba(0,0,0,0.85);
 				white-space: nowrap;
 				overflow: hidden;
@@ -390,16 +402,18 @@
 				align-items: center;
 				justify-content: center;
 				background: rgba(0,0,0,0.35);
+				backdrop-filter: blur(2px);
 			}
 
 			#deathCard, #tutorialPanel, #socialsPanel {
 				width: min(520px, calc(100vw - 80px));
-				background: rgba(255,255,255,0.92);
+				background: rgba(255,255,255,0.94);
 				border: 1px solid rgba(0,0,0,0.18);
 				border-radius: var(--uiRadius);
 				display: flex;
 				flex-direction: column;
 				overflow: hidden;
+				box-shadow: 0 3px 0 rgba(0,0,0,0.06);
 			}
 
 			#deathCard {
@@ -410,13 +424,13 @@
 
 			#deathSmall {
 				font-size: 18px;
-				font-weight: 700;
+				font-weight: 800;
 				color: rgba(0,0,0,0.72);
 			}
 
 			#deathBig {
 				font-size: 34px;
-				font-weight: 800;
+				font-weight: 900;
 				color: rgba(0,0,0,0.9);
 				margin-top: -6px;
 			}
@@ -426,7 +440,7 @@
 				height: calc(100vh - 80px);
 				max-width: 1200px;
 				max-height: 800px;
-				background: rgba(255,255,255,0.96);
+				background: rgba(255,255,255,0.965);
 			}
 
 			#tutorialHeader, #socialsHeader {
@@ -441,7 +455,7 @@
 
 			#tutorialTitle, #socialsTitle {
 				font-size: 20px;
-				font-weight: 800;
+				font-weight: 900;
 				color: rgba(0,0,0,0.88);
 			}
 
@@ -457,7 +471,7 @@
 
 			#tutorialText {
 				font-size: 20px;
-				font-weight: 600;
+				font-weight: 700;
 				color: rgba(0,0,0,0.88);
 				line-height: 1.55;
 				white-space: pre-wrap;
@@ -478,24 +492,32 @@
 				font-weight: 900;
 				background: linear-gradient(
 					to bottom,
-					#cfcfcf 0%,
-					#cfcfcf 66.666%,
+					#d3d3d3 0%,
+					#d3d3d3 66.666%,
 					#8c8c8c 66.666%,
 					#8c8c8c 100%
 				);
 				box-shadow:
 					inset 0 1px 0 var(--bevelTop),
 					inset 0 -1px 0 var(--bevelMid),
-					inset 0 -3px 0 var(--bevelDeep);
+					inset 0 -3px 0 var(--bevelDeep),
+					0 2px 0 rgba(0,0,0,0.05);
+				transition: transform 80ms linear, filter 80ms linear;
+			}
+
+			.closeBtn:hover {
+				filter: brightness(1.03) saturate(1.02);
+				transform: translateY(-0.5px);
 			}
 
 			.closeBtn:active {
 				box-shadow:
 					inset 0 -1px 0 var(--bevelTop),
 					inset 0 1px 0 var(--bevelMid),
-					inset 0 3px 0 var(--bevelDeep);
+					inset 0 3px 0 var(--bevelDeep),
+					0 1px 0 rgba(0,0,0,0.05);
 				transform: translateY(1px);
-				filter: brightness(0.97);
+				filter: brightness(0.98) saturate(0.98);
 			}
 
 			a.uiLink {
@@ -632,7 +654,14 @@
 				bctx.clearRect(0, 0, bg.width, bg.height);
 				bctx.fillStyle = "#ffffff";
 				bctx.fillRect(0, 0, bg.width, bg.height);
-				bctx.strokeStyle = "#e2e2e2";
+
+				const grad = bctx.createRadialGradient(bg.width * 0.5, bg.height * 0.5, 0, bg.width * 0.5, bg.height * 0.5, Math.max(bg.width, bg.height) * 0.75);
+				grad.addColorStop(0, "rgba(0,0,0,0.03)");
+				grad.addColorStop(1, "rgba(0,0,0,0.00)");
+				bctx.fillStyle = grad;
+				bctx.fillRect(0, 0, bg.width, bg.height);
+
+				bctx.strokeStyle = "rgba(0,0,0,0.10)";
 				bctx.lineWidth = 1;
 
 				ox -= speed;
