@@ -528,29 +528,45 @@ function drawOtherHealthbar(x, y, p) {
     if (!ctx)
         return;
     const maxHp = maxHpForPlayer(p);
-    const hpPct = Math.max(0, Math.min(1, p.hp / maxHp));
+    const hpVal = typeof p.hp === "number" && isFinite(p.hp) ? p.hp : maxHp;
+    const hpPct = Math.max(0, Math.min(1, hpVal / maxHp));
     const hh = hpHueGreenToRed(hpPct);
     const w = 78;
     const h = 10;
+    const r = 5;
     const bx = x - w / 2;
-    const by = y - hitRadius - 20;
+    const by = y - hitRadius - 22;
+    const rr = (x, y, w, h, rad) => {
+        const rr = Math.min(rad, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + rr, y);
+        ctx.arcTo(x + w, y, x + w, y + h, rr);
+        ctx.arcTo(x + w, y + h, x, y + h, rr);
+        ctx.arcTo(x, y + h, x, y, rr);
+        ctx.arcTo(x, y, x + w, y, rr);
+        ctx.closePath();
+    };
     ctx.save();
+    rr(bx - 1, by - 1, w + 2, h + 2, r + 1);
     ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.fillRect(bx - 1, by - 1, w + 2, h + 2);
+    ctx.fill();
+    rr(bx, by, w, h, r);
     ctx.fillStyle = "rgba(0,0,0,0.18)";
-    ctx.fillRect(bx, by, w, h);
+    ctx.fill();
     const fw = Math.max(0, w * hpPct);
     if (fw > 0) {
+        rr(bx, by, fw, h, r);
         ctx.fillStyle = `hsl(${hh}, 85%, 55%)`;
-        ctx.fillRect(bx, by, fw, h);
+        ctx.fill();
         ctx.globalAlpha = 0.28;
         ctx.fillStyle = "rgba(0,0,0,1)";
         ctx.fillRect(bx, by + h * 0.66, fw, h * 0.34);
         ctx.globalAlpha = 1;
     }
+    rr(bx - 1, by - 1, w + 2, h + 2, r + 1);
     ctx.strokeStyle = "rgba(0,0,0,0.22)";
     ctx.lineWidth = 1;
-    ctx.strokeRect(bx - 1, by - 1, w + 2, h + 2);
+    ctx.stroke();
     ctx.restore();
 }
 function loop() {
