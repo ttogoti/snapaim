@@ -4,13 +4,13 @@ const ctx = canvas.getContext("2d");
 const menu = document.getElementById("menu");
 const nameInput = document.getElementById("nameInput");
 const playBtn = document.getElementById("playBtn");
-const hudBottom = document.getElementById("hudBottom");
-const levelBarInner = document.getElementById("levelBarInner");
-const levelBarText = document.getElementById("levelBarText");
-const hudHp = document.getElementById("hudHp");
+const hpHud = document.getElementById("hpHud");
 const hpBarInner = document.getElementById("hpBarInner");
 const hpBarText = document.getElementById("hpBarText");
-const hudSpeed = document.getElementById("hudSpeed");
+const levelHud = document.getElementById("levelHud");
+const levelBarInner = document.getElementById("levelBarInner");
+const levelBarText = document.getElementById("levelBarText");
+const speedHud = document.getElementById("speedHud");
 const speedBarInner = document.getElementById("speedBarInner");
 const deathScreen = document.getElementById("deathScreen");
 const deathBig = document.getElementById("deathBig");
@@ -103,7 +103,6 @@ function resetSpeedSampler() {
     lastSpeedY = mouseY;
     smoothSpeed = 0;
     lastSpeedingSend = 0;
-    speedBarInner.style.height = "0%";
 }
 function updateSpeedFromMouse() {
     const tNow = performance.now();
@@ -119,8 +118,6 @@ function updateSpeedFromMouse() {
     lastSpeedT = tNow;
     lastSpeedX = mouseX;
     lastSpeedY = mouseY;
-    const spPct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
-    speedBarInner.style.height = `${spPct * 100}%`;
     if (!joined || isDead)
         return;
     if ((tNow - joinTimeMs) <= SPEED_GRACE_MS)
@@ -153,9 +150,9 @@ function showDeathScreen(killedBy) {
     isDead = true;
     stopConnection();
     hideRoomText();
-    hudBottom.style.display = "none";
-    hudHp.style.display = "none";
-    hudSpeed.style.display = "none";
+    hpHud.style.display = "none";
+    levelHud.style.display = "none";
+    speedHud.style.display = "none";
     leaderboard.style.display = "none";
     menu.style.display = "none";
     deathBig.textContent = killedBy;
@@ -173,15 +170,16 @@ function resetToMenu() {
     smooth.clear();
     resetSpeedSampler();
     deathScreen.style.display = "none";
-    hudBottom.style.display = "none";
-    hudHp.style.display = "none";
-    hudSpeed.style.display = "none";
+    hpHud.style.display = "none";
+    levelHud.style.display = "none";
+    speedHud.style.display = "none";
     leaderboard.style.display = "none";
     menu.style.display = "flex";
-    levelBarInner.style.width = "0%";
-    levelBarText.textContent = "Level: 1";
     hpBarInner.style.width = "0%";
     hpBarText.textContent = "HP: 0/0";
+    levelBarInner.style.width = "0%";
+    levelBarText.textContent = "Level: 1";
+    speedBarInner.style.height = "0%";
     nameInput.value = "";
     nameInput.focus();
 }
@@ -201,9 +199,9 @@ function startGame() {
     resetSpeedSampler();
     deathScreen.style.display = "none";
     menu.style.display = "none";
-    hudBottom.style.display = "flex";
-    hudHp.style.display = "block";
-    hudSpeed.style.display = "block";
+    hpHud.style.display = "block";
+    levelHud.style.display = "block";
+    speedHud.style.display = "block";
     leaderboard.style.display = "block";
     showRoomText();
     setRoomTextCount(null);
@@ -240,7 +238,10 @@ function setLeaderboard(rows) {
         row.className = "lbRow";
         const left = document.createElement("div");
         left.className = "lbName";
-        left.textContent = `${i + 1}. ${String(r?.name ?? "Player")}`;
+        const nm = String(r?.name ?? "Player");
+        left.textContent = `${i + 1}. ${nm}`;
+        if (nm === myName)
+            left.classList.add("me");
         const right = document.createElement("div");
         right.className = "lbDmg";
         right.textContent = `${Math.round(Number(r?.damage ?? 0)).toLocaleString()}`;
@@ -389,6 +390,7 @@ window.addEventListener("pointermove", (e) => {
     mouseX = e.clientX;
     mouseY = e.clientY;
     updateSpeedFromMouse();
+    updateSpeedBar();
     const now = performance.now();
     if (ws && ws.readyState === WebSocket.OPEN && now - lastMoveSend >= MOVE_SEND_MS) {
         lastMoveSend = now;
@@ -407,6 +409,73 @@ function maxHpForPlayer(p) {
         return myMaxHp;
     return 1;
 }
+function hsl(h, s, l) {
+    return `hsl(${h}, ${s}%, ${l}%)`;
+}
+function setFillGradientHorizontal(el, baseHue) {
+    const normal = hsl(baseHue, 92, 55);
+    const darker = hsl(baseHue, 92, 45);
+    el.style.background = `linear-gradient(to bottom, ${darker} 0%, ${darker} 33.333%, ${normal} 33.333%, ${normal} 100%)`;
+}
+function setFillGradientVertical(el, baseHue) {
+    const normal = hsl(baseHue, 92, 55);
+    const darker = hsl(baseHue, 92, 45);
+    el.style.background = `linear-gradient(to bottom, ${darker} 0%, ${darker} 33.333%, ${normal} 33.333%, ${normal} 100%)`;
+}
+function hpHueGreenToRed(pct) {
+    const t = Math.max(0, Math.min(1, pct));
+    return 120 - 120 * (1 - t);
+}
+function speedHueYellowToRed(pct) {
+    const t = Math.max(0, Math.min(1, pct));
+    return 60 - 60 * t;
+}
+function updateHpBar() {
+    if (!joined || !myId) {
+        hpBarInner.style.width = "0%";
+        hpBarText.textContent = "HP: 0/0";
+        return;
+    }
+    const me = players.get(myId);
+    if (!me)
+        return;
+    const maxHp = maxHpForPlayer(me);
+    const pct = Math.max(0, Math.min(1, me.hp / maxHp));
+    hpBarInner.style.width = `${pct * 100}%`;
+    const hue = hpHueGreenToRed(pct);
+    setFillGradientHorizontal(hpBarInner, hue);
+    hpBarText.textContent = `HP: ${Math.round(me.hp).toLocaleString()}/${Math.round(maxHp).toLocaleString()}`;
+}
+function updateLevelBar() {
+    if (!joined || !myId) {
+        levelBarInner.style.width = "0%";
+        levelBarText.textContent = "Level: 1";
+        return;
+    }
+    const me = players.get(myId);
+    if (!me)
+        return;
+    const level = typeof me.level === "number" && isFinite(me.level) ? me.level : 1;
+    const inLvl = typeof me.killsInLevel === "number" && isFinite(me.killsInLevel) ? me.killsInLevel : 0;
+    const need = typeof me.killsNeeded === "number" && isFinite(me.killsNeeded) && me.killsNeeded > 0 ? me.killsNeeded : 3;
+    const pct = Math.max(0, Math.min(1, inLvl / need));
+    if (pct <= 0)
+        levelBarInner.style.width = "14px";
+    else
+        levelBarInner.style.width = `${pct * 100}%`;
+    levelBarInner.style.background = "linear-gradient(to bottom, #2f76ff 0%, #2f76ff 33.333%, #7fb6ff 33.333%, #7fb6ff 100%)";
+    levelBarText.textContent = `Level: ${level}`;
+}
+function updateSpeedBar() {
+    if (!joined || isDead) {
+        speedBarInner.style.height = "0%";
+        return;
+    }
+    const pct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
+    speedBarInner.style.height = `${pct * 100}%`;
+    const hue = speedHueYellowToRed(pct);
+    setFillGradientVertical(speedBarInner, hue);
+}
 function roundedRect(x, y, w, h, r) {
     const rr = Math.max(0, Math.min(r, Math.min(w, h) / 2));
     ctx.beginPath();
@@ -416,10 +485,6 @@ function roundedRect(x, y, w, h, r) {
     ctx.arcTo(x, y + h, x, y, rr);
     ctx.arcTo(x, y, x + w, y, rr);
     ctx.closePath();
-}
-function hpHueGreenToRed(pct) {
-    const t = Math.max(0, Math.min(1, pct));
-    return 120 * t;
 }
 function drawOtherHpBar(x, y, p) {
     const maxHp = maxHpForPlayer(p);
@@ -433,10 +498,17 @@ function drawOtherHpBar(x, y, p) {
     ctx.fillStyle = "rgba(0,0,0,0.20)";
     roundedRect(bx, by, w, h, r);
     ctx.fill();
+    const hue = hpHueGreenToRed(pct);
+    const normal = hsl(hue, 92, 55);
+    const darker = hsl(hue, 92, 45);
     const fw = w * pct;
     if (fw > 0) {
-        const hue = hpHueGreenToRed(pct);
-        ctx.fillStyle = `hsl(${hue}, 95%, 55%)`;
+        const grad = ctx.createLinearGradient(0, by, 0, by + h);
+        grad.addColorStop(0, darker);
+        grad.addColorStop(0.33333, darker);
+        grad.addColorStop(0.33334, normal);
+        grad.addColorStop(1, normal);
+        ctx.fillStyle = grad;
         roundedRect(bx, by, fw, h, r);
         ctx.fill();
     }
@@ -475,46 +547,12 @@ function drawOtherLabel(x, y, p) {
     ctx.fillStyle = "rgba(255,255,255,0.92)";
     ctx.fillText(numText, startX + numW / 2, line2Y);
     ctx.font = "12px Ubuntu, system-ui";
+    ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(55,55,55,0.95)";
     ctx.strokeText(suffix, startX + numW + sufW / 2, line2Y);
     ctx.fillStyle = "rgba(255,255,255,0.92)";
     ctx.fillText(suffix, startX + numW + sufW / 2, line2Y);
     ctx.restore();
-}
-function updateLevelBar() {
-    if (!joined || !myId) {
-        levelBarInner.style.width = "0%";
-        levelBarText.textContent = "Level: 1";
-        return;
-    }
-    const me = players.get(myId);
-    if (!me)
-        return;
-    const level = typeof me.level === "number" && isFinite(me.level) ? me.level : 1;
-    const inLvl = typeof me.killsInLevel === "number" && isFinite(me.killsInLevel) ? me.killsInLevel : 0;
-    const need = typeof me.killsNeeded === "number" && isFinite(me.killsNeeded) && me.killsNeeded > 0 ? me.killsNeeded : 3;
-    const pct = Math.max(0, Math.min(1, inLvl / need));
-    if (pct <= 0) {
-        levelBarInner.style.width = "14px";
-    }
-    else {
-        levelBarInner.style.width = `${pct * 100}%`;
-    }
-    levelBarText.textContent = `Level: ${level}`;
-}
-function updateHpHud() {
-    if (!joined || !myId || isDead) {
-        hpBarInner.style.width = "0%";
-        hpBarText.textContent = "HP: 0/0";
-        return;
-    }
-    const me = players.get(myId);
-    if (!me)
-        return;
-    const maxHp = maxHpForPlayer(me);
-    const hpPct = Math.max(0, Math.min(1, me.hp / maxHp));
-    hpBarInner.style.width = `${hpPct * 100}%`;
-    hpBarText.textContent = `HP: ${Math.round(me.hp).toLocaleString()}/${Math.round(maxHp).toLocaleString()}`;
 }
 function loop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -532,14 +570,15 @@ function loop() {
         ctx.save();
         ctx.beginPath();
         ctx.arc(x, y, hitRadius, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(235,70,70,0.95)";
+        ctx.fillStyle = "rgba(240,80,80,0.95)";
         ctx.fill();
         ctx.restore();
         drawOtherHpBar(x, y, p);
         drawOtherLabel(x, y, p);
     }
+    updateHpBar();
     updateLevelBar();
-    updateHpHud();
+    updateSpeedBar();
     requestAnimationFrame(loop);
 }
 hideRoomText();
