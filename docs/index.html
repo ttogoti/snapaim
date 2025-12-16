@@ -1,650 +1,673 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SnapAim</title>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700;800&display=swap" rel="stylesheet">
-
-    <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        font-family: "Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      }
-
-      html, body {
-        height: 100%;
-        width: 100%;
-        overflow: hidden;
-        background: #ffffff;
-      }
-
-      #bg, #c {
-        position: fixed;
-        inset: 0;
-        width: 100vw;
-        height: 100vh;
-        display: block;
-      }
-      #bg { z-index: 0; }
-      #c  { z-index: 1; }
-
-      :root {
-        --menuW: min(640px, calc(100vw - 120px));
-        --uiRadius: 6px;
-        --outline: rgba(0,0,0,0.92);
-        --outlineSize: 2.25px;
-        --borderW: 3.75px;
-        --bevelTop: rgba(255,255,255,0.65);
-        --bevelMid: rgba(0,0,0,0.25);
-        --bevelDeep: rgba(0,0,0,0.35);
-      }
-
-      .btnOutlinedText {
-        color: rgba(255,255,255,0.98);
-        text-shadow:
-          var(--outlineSize) 0 var(--outline),
-          calc(var(--outlineSize) * -1) 0 var(--outline),
-          0 var(--outlineSize) var(--outline),
-          0 calc(var(--outlineSize) * -1) var(--outline),
-          calc(var(--outlineSize) * 0.9) calc(var(--outlineSize) * 0.9) var(--outline),
-          calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * 0.9) var(--outline),
-          calc(var(--outlineSize) * 0.9) calc(var(--outlineSize) * -0.9) var(--outline),
-          calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * -0.9) var(--outline);
-      }
-
-      .uiBtn {
-        width: 320px;
-        height: 48px;
-        align-self: center;
-        border-radius: var(--uiRadius);
-        border: var(--borderW) solid rgba(0,0,0,0.22);
-        cursor: pointer;
-        user-select: none;
-        font-weight: 800;
-        letter-spacing: 0.3px;
-        box-shadow:
-          inset 0 1px 0 var(--bevelTop),
-          inset 0 -1px 0 var(--bevelMid),
-          inset 0 -3px 0 var(--bevelDeep);
-        transform: translateY(0);
-        filter: brightness(1);
-      }
-
-      .uiBtn:active {
-        box-shadow:
-          inset 0 -1px 0 var(--bevelTop),
-          inset 0 1px 0 var(--bevelMid),
-          inset 0 3px 0 var(--bevelDeep);
-        transform: translateY(1px);
-        filter: brightness(0.97);
-      }
-
-      .uiBtnBig { height: 48px; font-size: 22px; }
-      .uiBtnMed { height: 40px; font-size: 16px; letter-spacing: 0.25px; }
-      .uiBtnSm  { height: 38px; font-size: 16px; letter-spacing: 0.25px; }
-
-      .btnGray {
-        background: linear-gradient(
-          to bottom,
-          #b9b9b9 0%,
-          #b9b9b9 66.666%,
-          #7c7c7c 66.666%,
-          #7c7c7c 100%
-        );
-      }
-
-      .btnGreen {
-        background: linear-gradient(
-          to bottom,
-          #7fe27f 0%,
-          #7fe27f 66.666%,
-          #4fbf4f 66.666%,
-          #4fbf4f 100%
-        );
-      }
-
-      .btnBlue {
-        background: linear-gradient(
-          to bottom,
-          #7fb6ff 0%,
-          #7fb6ff 66.666%,
-          #2f76ff 66.666%,
-          #2f76ff 100%
-        );
-      }
-
-      .btnPurple {
-        background: linear-gradient(
-          to bottom,
-          #b88bff 0%,
-          #b88bff 66.666%,
-          #7b3dff 66.666%,
-          #7b3dff 100%
-        );
-      }
-
-      #menu {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 2;
-      }
-
-      #menuInner {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 14px;
-      }
-
-      #nameInput {
-        width: var(--menuW);
-        height: 66px;
-        background: #ffffff;
-        color: #000000;
-        border: var(--borderW) solid rgba(0,0,0,0.22);
-        border-radius: var(--uiRadius);
-        outline: none;
-        font-size: 22px;
-        font-weight: 700;
-        text-align: center;
-        box-shadow:
-          inset 0 1px 0 rgba(255,255,255,0.75),
-          inset 0 -1px 0 rgba(0,0,0,0.18),
-          inset 0 -3px 0 rgba(0,0,0,0.22);
-      }
-
-      #nameInput::placeholder {
-        color: #7a7a7a;
-        font-weight: 600;
-      }
-
-      #hudBottom {
-        position: fixed;
-        left: 50%;
-        bottom: 22px;
-        transform: translateX(-50%);
-        width: min(860px, calc(100vw - 48px));
-        display: none;
-        flex-direction: column;
-        align-items: center;
-        gap: 10px;
-        pointer-events: none;
-        z-index: 3;
-      }
-
-      #hpHud {
-        position: fixed;
-        left: 50%;
-        bottom: 18px;
-        transform: translateX(-50%);
-        width: min(980px, calc(100vw - 80px));
-        z-index: 3;
-        pointer-events: none;
-        display: none;
-      }
-
-      #levelHud {
-        position: fixed;
-        left: 50%;
-        bottom: 54px;
-        transform: translateX(-50%);
-        width: min(860px, calc(100vw - 120px));
-        z-index: 3;
-        pointer-events: none;
-        display: none;
-      }
-
-      #speedHud {
-        position: fixed;
-        left: 18px;
-        top: 120px;
-        width: 18px;
-        height: min(520px, calc(100vh - 220px));
-        z-index: 3;
-        pointer-events: none;
-        display: none;
-      }
-
-      .barOuter {
-        position: relative;
-        width: 100%;
-        height: 18px;
-        border-radius: 10px;
-        overflow: hidden;
-        background: rgba(0,0,0,0.10);
-        border: 2px solid rgba(0,0,0,0.20);
-        box-shadow:
-          inset 0 1px 0 rgba(255,255,255,0.70),
-          inset 0 -1px 0 rgba(0,0,0,0.18),
-          inset 0 -3px 0 rgba(0,0,0,0.20);
-      }
-
-      .barOuterTall {
-        width: 100%;
-        height: 18px;
-      }
-
-      .barOuterV {
-        position: relative;
-        width: 100%;
-        height: 100%;
-        border-radius: 10px;
-        overflow: hidden;
-        background: rgba(0,0,0,0.10);
-        border: 2px solid rgba(0,0,0,0.20);
-        box-shadow:
-          inset 0 1px 0 rgba(255,255,255,0.70),
-          inset 0 -1px 0 rgba(0,0,0,0.18),
-          inset 0 -3px 0 rgba(0,0,0,0.20);
-      }
-
-      .barInner {
-        position: absolute;
-        left: 0;
-        top: 0;
-        height: 100%;
-        width: 0%;
-        border-radius: 10px;
-        background: #7c7c7c;
-        z-index: 1;
-      }
-
-      .barInnerV {
-        position: absolute;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        height: 0%;
-        border-radius: 10px;
-        background: #7c7c7c;
-        z-index: 1;
-      }
-
-      .barGloss {
-        position: absolute;
-        left: 0;
-        top: 0;
-        height: 100%;
-        width: 100%;
-        z-index: 3;
-        pointer-events: none;
-        background: linear-gradient(
-          to bottom,
-          rgba(255,255,255,0.55) 0%,
-          rgba(255,255,255,0.10) 35%,
-          rgba(0,0,0,0.00) 70%,
-          rgba(0,0,0,0.14) 100%
-        );
-        mix-blend-mode: multiply;
-      }
-
-      .barText {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 900;
-        font-size: 12px;
-        line-height: 1;
-        color: rgba(255, 255, 255, 0.98);
-        user-select: none;
-        pointer-events: none;
-        text-shadow:
-          1px 0 rgba(0, 0, 0, 0.85),
-          -1px 0 rgba(0, 0, 0, 0.85),
-          0 1px rgba(0, 0, 0, 0.85),
-          0 -1px rgba(0, 0, 0, 0.85);
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        text-rendering: geometricPrecision;
-        z-index: 4;
-      }
-
-      #deathScreen, #tutorialScreen, #socialsScreen {
-        position: fixed;
-        inset: 0;
-        z-index: 4;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        background: rgba(0,0,0,0.35);
-      }
-
-      #deathCard, #tutorialPanel, #socialsPanel {
-        width: min(520px, calc(100vw - 80px));
-        background: rgba(255,255,255,0.92);
-        border: 1px solid rgba(0,0,0,0.18);
-        border-radius: var(--uiRadius);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
-
-      #deathCard {
-        padding: 18px;
-        align-items: center;
-        gap: 10px;
-      }
-
-      #deathSmall {
-        font-size: 18px;
-        font-weight: 700;
-        color: rgba(0,0,0,0.72);
-      }
-
-      #deathBig {
-        font-size: 34px;
-        font-weight: 800;
-        color: rgba(0,0,0,0.9);
-        margin-top: -6px;
-      }
-
-      #tutorialPanel, #socialsPanel {
-        width: calc(100vw - 80px);
-        height: calc(100vh - 80px);
-        max-width: 1200px;
-        max-height: 800px;
-        background: rgba(255,255,255,0.96);
-      }
-
-      #tutorialHeader, #socialsHeader {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 14px 16px;
-        border-bottom: 1px solid rgba(0,0,0,0.12);
-        background: rgba(0,0,0,0.03);
-        gap: 12px;
-      }
-
-      #tutorialTitle, #socialsTitle {
-        font-size: 20px;
-        font-weight: 800;
-        color: rgba(0,0,0,0.88);
-      }
-
-      #tutorialBody, #socialsBody {
-        padding: 18px;
-        overflow: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        align-items: center;
-        justify-content: flex-start;
-      }
-
-      #tutorialText {
-        font-size: 20px;
-        font-weight: 600;
-        color: rgba(0,0,0,0.88);
-        line-height: 1.55;
-        white-space: pre-wrap;
-        width: min(980px, 100%);
-      }
-
-      .closeBtn {
-        width: 44px;
-        height: 38px;
-        border-radius: var(--uiRadius);
-        border: var(--borderW) solid rgba(0,0,0,0.22);
-        cursor: pointer;
-        user-select: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        font-weight: 900;
-        background: linear-gradient(
-          to bottom,
-          #cfcfcf 0%,
-          #cfcfcf 66.666%,
-          #8c8c8c 66.666%,
-          #8c8c8c 100%
-        );
-        box-shadow:
-          inset 0 1px 0 var(--bevelTop),
-          inset 0 -1px 0 var(--bevelMid),
-          inset 0 -3px 0 var(--bevelDeep);
-      }
-
-      .closeBtn:active {
-        box-shadow:
-          inset 0 -1px 0 var(--bevelTop),
-          inset 0 1px 0 var(--bevelMid),
-          inset 0 3px 0 var(--bevelDeep);
-        transform: translateY(1px);
-        filter: brightness(0.97);
-      }
-
-      a.uiLink {
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      #leaderboard {
-        position: fixed;
-        top: 14px;
-        right: 14px;
-        z-index: 3;
-        width: 260px;
-        pointer-events: none;
-        background: rgba(255,255,255,0.25);
-        border: 2px solid rgba(0,0,0,0.20);
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow:
-          inset 0 1px 0 rgba(255,255,255,0.40),
-          inset 0 -1px 0 rgba(0,0,0,0.10),
-          inset 0 -3px 0 rgba(0,0,0,0.12);
-        backdrop-filter: blur(4px);
-      }
-
-      #leaderboardHeader {
-        padding: 10px 12px;
-        font-weight: 800;
-        font-size: 14px;
-        color: rgba(0,0,0,0.88);
-        background: rgba(255,255,255,0.20);
-        border-bottom: 1px solid rgba(0,0,0,0.12);
-      }
-
-      #leaderboardBody {
-        padding: 8px 10px 10px 10px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-
-      .lbRow {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        font-size: 12px;
-        font-weight: 800;
-        color: rgba(0,0,0,0.85);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .lbName {
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .lbName.me {
-        color: rgba(20,140,50,0.95);
-      }
-
-      .lbDmg {
-        flex: 0 0 auto;
-        font-variant-numeric: tabular-nums;
-      }
-    </style>
-  </head>
-
-  <body>
-    <canvas id="bg"></canvas>
-    <canvas id="c"></canvas>
-
-    <div id="leaderboard" style="display:none;">
-      <div id="leaderboardHeader">Damage</div>
-      <div id="leaderboardBody"></div>
-    </div>
-
-    <div id="speedHud" style="display:none;">
-      <div class="barOuterV">
-        <div id="speedBarInner" class="barInnerV"></div>
-        <div class="barGloss"></div>
-      </div>
-    </div>
-
-    <div id="levelHud" style="display:none;">
-      <div class="barOuter">
-        <div id="levelBarInner" class="barInner"></div>
-        <div class="barGloss"></div>
-        <div id="levelBarText" class="barText">Level: 1</div>
-      </div>
-    </div>
-
-    <div id="hpHud" style="display:none;">
-      <div class="barOuter barOuterTall">
-        <div id="hpBarInner" class="barInner"></div>
-        <div class="barGloss"></div>
-        <div id="hpBarText" class="barText">HP: 0/0</div>
-      </div>
-    </div>
-
-    <div id="menu">
-      <div id="menuInner">
-        <input id="nameInput" maxlength="18" placeholder="Good luck, ... (PUT USERNAME HERE)" />
-        <button id="playBtn" class="uiBtn uiBtnBig btnOutlinedText btnGray">Play!</button>
-        <button id="tutorialBtn" class="uiBtn uiBtnMed btnOutlinedText btnGreen">Tutorial</button>
-        <button id="socialsBtn" class="uiBtn uiBtnMed btnOutlinedText btnBlue">Socials</button>
-      </div>
-    </div>
-
-    <div id="tutorialScreen">
-      <div id="tutorialPanel">
-        <div id="tutorialHeader">
-          <div id="tutorialTitle">Tutorial</div>
-          <button id="tutorialClose" class="closeBtn btnOutlinedText">✕</button>
-        </div>
-        <div id="tutorialBody">
-          <div id="tutorialText">The faster you go, the more damage you can do. Click to apply damage at your speed. If you move too fast, you get punished. Your mouse is your character.</div>
-        </div>
-      </div>
-    </div>
-
-    <div id="socialsScreen">
-      <div id="socialsPanel">
-        <div id="socialsHeader">
-          <div id="socialsTitle">Socials</div>
-          <button id="socialsClose" class="closeBtn btnOutlinedText">✕</button>
-        </div>
-        <div id="socialsBody">
-          <a class="uiLink uiBtn uiBtnBig btnOutlinedText btnBlue" id="discordBtn" href="https://discord.gg/YE4VKhRn2X" target="_blank" rel="noopener noreferrer">Discord</a>
-          <a class="uiLink uiBtn uiBtnBig btnOutlinedText btnPurple" id="xBtn" href="https://x.com/hexasixdice" target="_blank" rel="noopener noreferrer">X</a>
-        </div>
-      </div>
-    </div>
-
-    <div id="deathScreen">
-      <div id="deathCard">
-        <div id="deathSmall">You died to</div>
-        <div id="deathBig">Unknown</div>
-        <button id="continueBtn" class="uiBtn uiBtnSm btnOutlinedText btnGray">Continue</button>
-      </div>
-    </div>
-
-    <script>
-      const tutorialBtn = document.getElementById("tutorialBtn");
-      const tutorialScreen = document.getElementById("tutorialScreen");
-      const tutorialClose = document.getElementById("tutorialClose");
-
-      const socialsBtn = document.getElementById("socialsBtn");
-      const socialsScreen = document.getElementById("socialsScreen");
-      const socialsClose = document.getElementById("socialsClose");
-
-      function openTutorial() { if (tutorialScreen) tutorialScreen.style.display = "flex"; }
-      function closeTutorial() { if (tutorialScreen) tutorialScreen.style.display = "none"; }
-      function openSocials() { if (socialsScreen) socialsScreen.style.display = "flex"; }
-      function closeSocials() { if (socialsScreen) socialsScreen.style.display = "none"; }
-
-      if (tutorialBtn) tutorialBtn.addEventListener("click", openTutorial);
-      if (tutorialClose) tutorialClose.addEventListener("click", closeTutorial);
-      if (socialsBtn) socialsBtn.addEventListener("click", openSocials);
-      if (socialsClose) socialsClose.addEventListener("click", closeSocials);
-
-      if (tutorialScreen) tutorialScreen.addEventListener("click", (e) => { if (e.target === tutorialScreen) closeTutorial(); });
-      if (socialsScreen) socialsScreen.addEventListener("click", (e) => { if (e.target === socialsScreen) closeSocials(); });
-
-      window.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") {
-          if (tutorialScreen && tutorialScreen.style.display === "flex") closeTutorial();
-          if (socialsScreen && socialsScreen.style.display === "flex") closeSocials();
-        }
-      });
-
-      const bg = document.getElementById("bg");
-      const bctx = bg ? bg.getContext("2d") : null;
-
-      function resizeBg() {
-        if (!bg) return;
-        bg.width = window.innerWidth;
-        bg.height = window.innerHeight;
-      }
-      window.addEventListener("resize", resizeBg);
-      resizeBg();
-
-      let ox = 0, oy = 0;
-      const spacing = 40;
-      const speed = 0.22;
-
-      function drawGrid() {
-        if (!bg || !bctx) return;
-
-        bctx.clearRect(0, 0, bg.width, bg.height);
-        bctx.fillStyle = "#ffffff";
-        bctx.fillRect(0, 0, bg.width, bg.height);
-        bctx.strokeStyle = "#e2e2e2";
-        bctx.lineWidth = 1;
-
-        ox -= speed;
-        oy -= speed;
-        if (ox <= -spacing) ox += spacing;
-        if (oy <= -spacing) oy += spacing;
-
-        for (let x = ox; x < bg.width; x += spacing) {
-          bctx.beginPath();
-          bctx.moveTo(x, 0);
-          bctx.lineTo(x, bg.height);
-          bctx.stroke();
-        }
-        for (let y = oy; y < bg.height; y += spacing) {
-          bctx.beginPath();
-          bctx.moveTo(0, y);
-          bctx.lineTo(bg.width, y);
-          bctx.stroke();
-        }
-
-        requestAnimationFrame(drawGrid);
-      }
-      drawGrid();
-    </script>
-
-    <script defer src="./main.js"></script>
-  </body>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>SnapAim</title>
+
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700;800&display=swap" rel="stylesheet">
+
+		<style>
+			* {
+				box-sizing: border-box;
+				margin: 0;
+				padding: 0;
+				font-family: "Ubuntu", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+			}
+
+			html, body {
+				height: 100%;
+				width: 100%;
+				overflow: hidden;
+				background: #ffffff;
+			}
+
+			#bg, #c {
+				position: fixed;
+				inset: 0;
+				width: 100vw;
+				height: 100vh;
+				display: block;
+			}
+			#bg { z-index: 0; }
+			#c  { z-index: 1; }
+
+			:root {
+				--menuW: min(640px, calc(100vw - 120px));
+				--uiRadius: 6px;
+				--outline: rgba(0,0,0,0.92);
+				--outlineSize: 2.25px;
+				--borderW: 3.75px;
+				--bevelTop: rgba(255,255,255,0.65);
+				--bevelMid: rgba(0,0,0,0.25);
+				--bevelDeep: rgba(0,0,0,0.35);
+			}
+
+			.btnOutlinedText {
+				color: rgba(255,255,255,0.98);
+				text-shadow:
+					var(--outlineSize) 0 var(--outline),
+					calc(var(--outlineSize) * -1) 0 var(--outline),
+					0 var(--outlineSize) var(--outline),
+					0 calc(var(--outlineSize) * -1) var(--outline),
+					calc(var(--outlineSize) * 0.9) calc(var(--outlineSize) * 0.9) var(--outline),
+					calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * 0.9) var(--outline),
+					calc(var(--outlineSize) * 0.9) calc(var(--outlineSize) * -0.9) var(--outline),
+					calc(var(--outlineSize) * -0.9) calc(var(--outlineSize) * -0.9) var(--outline);
+			}
+
+			.uiBtn {
+				width: 320px;
+				height: 48px;
+				align-self: center;
+				border-radius: var(--uiRadius);
+				border: var(--borderW) solid rgba(0,0,0,0.22);
+				cursor: pointer;
+				user-select: none;
+				font-weight: 800;
+				letter-spacing: 0.3px;
+				box-shadow:
+					inset 0 1px 0 var(--bevelTop),
+					inset 0 -1px 0 var(--bevelMid),
+					inset 0 -3px 0 var(--bevelDeep);
+				transform: translateY(0);
+				filter: brightness(1);
+			}
+
+			.uiBtn:active {
+				box-shadow:
+					inset 0 -1px 0 var(--bevelTop),
+					inset 0 1px 0 var(--bevelMid),
+					inset 0 3px 0 var(--bevelDeep);
+				transform: translateY(1px);
+				filter: brightness(0.97);
+			}
+
+			.uiBtnBig { height: 48px; font-size: 22px; }
+			.uiBtnMed { height: 40px; font-size: 16px; letter-spacing: 0.25px; }
+			.uiBtnSm  { height: 38px; font-size: 16px; letter-spacing: 0.25px; }
+
+			.btnGray {
+				background: linear-gradient(
+					to bottom,
+					#b9b9b9 0%,
+					#b9b9b9 66.666%,
+					#7c7c7c 66.666%,
+					#7c7c7c 100%
+				);
+			}
+
+			.btnGreen {
+				background: linear-gradient(
+					to bottom,
+					#7fe27f 0%,
+					#7fe27f 66.666%,
+					#4fbf4f 66.666%,
+					#4fbf4f 100%
+				);
+			}
+
+			.btnBlue {
+				background: linear-gradient(
+					to bottom,
+					#7fb6ff 0%,
+					#7fb6ff 66.666%,
+					#2f76ff 66.666%,
+					#2f76ff 100%
+				);
+			}
+
+			.btnPurple {
+				background: linear-gradient(
+					to bottom,
+					#b88bff 0%,
+					#b88bff 66.666%,
+					#7b3dff 66.666%,
+					#7b3dff 100%
+				);
+			}
+
+			#menu {
+				position: fixed;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				z-index: 2;
+			}
+
+			#menuInner {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 14px;
+			}
+
+			#nameInput {
+				width: var(--menuW);
+				height: 66px;
+				background: #ffffff;
+				color: #000000;
+				border: var(--borderW) solid rgba(0,0,0,0.22);
+				border-radius: var(--uiRadius);
+				outline: none;
+				font-size: 22px;
+				font-weight: 700;
+				text-align: center;
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.75),
+					inset 0 -1px 0 rgba(0,0,0,0.18),
+					inset 0 -3px 0 rgba(0,0,0,0.22);
+			}
+
+			#nameInput::placeholder {
+				color: #7a7a7a;
+				font-weight: 600;
+			}
+
+			#deathScreen, #tutorialScreen, #socialsScreen {
+				position: fixed;
+				inset: 0;
+				z-index: 6;
+				display: none;
+				align-items: center;
+				justify-content: center;
+				background: rgba(0,0,0,0.35);
+			}
+
+			#deathCard, #tutorialPanel, #socialsPanel {
+				width: min(520px, calc(100vw - 80px));
+				background: rgba(255,255,255,0.92);
+				border: 1px solid rgba(0,0,0,0.18);
+				border-radius: var(--uiRadius);
+				display: flex;
+				flex-direction: column;
+				overflow: hidden;
+			}
+
+			#deathCard {
+				padding: 18px;
+				align-items: center;
+				gap: 10px;
+			}
+
+			#deathSmall {
+				font-size: 18px;
+				font-weight: 700;
+				color: rgba(0,0,0,0.72);
+			}
+
+			#deathBig {
+				font-size: 34px;
+				font-weight: 800;
+				color: rgba(0,0,0,0.9);
+				margin-top: -6px;
+			}
+
+			#tutorialPanel, #socialsPanel {
+				width: calc(100vw - 80px);
+				height: calc(100vh - 80px);
+				max-width: 1200px;
+				max-height: 800px;
+				background: rgba(255,255,255,0.96);
+			}
+
+			#tutorialHeader, #socialsHeader {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 14px 16px;
+				border-bottom: 1px solid rgba(0,0,0,0.12);
+				background: rgba(0,0,0,0.03);
+				gap: 12px;
+			}
+
+			#tutorialTitle, #socialsTitle {
+				font-size: 20px;
+				font-weight: 800;
+				color: rgba(0,0,0,0.88);
+			}
+
+			#tutorialBody, #socialsBody {
+				padding: 18px;
+				overflow: auto;
+				display: flex;
+				flex-direction: column;
+				gap: 14px;
+				align-items: center;
+				justify-content: flex-start;
+			}
+
+			#tutorialText {
+				font-size: 20px;
+				font-weight: 600;
+				color: rgba(0,0,0,0.88);
+				line-height: 1.55;
+				white-space: pre-wrap;
+				width: min(980px, 100%);
+			}
+
+			.closeBtn {
+				width: 44px;
+				height: 38px;
+				border-radius: var(--uiRadius);
+				border: var(--borderW) solid rgba(0,0,0,0.22);
+				cursor: pointer;
+				user-select: none;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-size: 18px;
+				font-weight: 900;
+				background: linear-gradient(
+					to bottom,
+					#cfcfcf 0%,
+					#cfcfcf 66.666%,
+					#8c8c8c 66.666%,
+					#8c8c8c 100%
+				);
+				box-shadow:
+					inset 0 1px 0 var(--bevelTop),
+					inset 0 -1px 0 var(--bevelMid),
+					inset 0 -3px 0 var(--bevelDeep);
+			}
+
+			.closeBtn:active {
+				box-shadow:
+					inset 0 -1px 0 var(--bevelTop),
+					inset 0 1px 0 var(--bevelMid),
+					inset 0 3px 0 var(--bevelDeep);
+				transform: translateY(1px);
+				filter: brightness(0.97);
+			}
+
+			a.uiLink {
+				text-decoration: none;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+			}
+
+			#leaderboard {
+				position: fixed;
+				top: 14px;
+				right: 14px;
+				z-index: 5;
+				width: 260px;
+				pointer-events: none;
+				background: rgba(255,255,255,0.22);
+				border: 2px solid rgba(0,0,0,0.18);
+				border-radius: 10px;
+				overflow: hidden;
+				backdrop-filter: blur(6px);
+				-webkit-backdrop-filter: blur(6px);
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.55),
+					inset 0 -1px 0 rgba(0,0,0,0.14),
+					inset 0 -3px 0 rgba(0,0,0,0.16);
+			}
+
+			#leaderboardHeader {
+				padding: 10px 12px;
+				font-weight: 800;
+				font-size: 14px;
+				color: rgba(0,0,0,0.88);
+				background: rgba(255,255,255,0.25);
+				border-bottom: 1px solid rgba(0,0,0,0.12);
+			}
+
+			#leaderboardBody {
+				padding: 8px 10px 10px 10px;
+				display: flex;
+				flex-direction: column;
+				gap: 6px;
+			}
+
+			.lbRow {
+				display: flex;
+				justify-content: space-between;
+				gap: 10px;
+				font-size: 12px;
+				font-weight: 700;
+				color: rgba(0,0,0,0.85);
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			.lbName {
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+
+			.lbName.me {
+				color: rgba(0, 170, 70, 0.95);
+				font-weight: 900;
+			}
+
+			.lbDmg {
+				flex: 0 0 auto;
+				font-variant-numeric: tabular-nums;
+			}
+
+			#hudBottom {
+				position: fixed;
+				left: 50%;
+				bottom: 22px;
+				transform: translateX(-50%);
+				width: min(860px, calc(100vw - 48px));
+				display: none;
+				flex-direction: column;
+				align-items: center;
+				gap: 10px;
+				pointer-events: none;
+				z-index: 5;
+			}
+
+			#hudLeft {
+				position: fixed;
+				left: 14px;
+				top: 50%;
+				transform: translateY(-50%);
+				display: none;
+				pointer-events: none;
+				z-index: 5;
+			}
+
+			.hudStack {
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				align-items: center;
+			}
+
+			.barOuter {
+				position: relative;
+				overflow: hidden;
+				border-radius: 12px;
+				background: rgba(0,0,0,0.10);
+			}
+
+			.barOuter.h {
+				width: 100%;
+				height: 22px;
+			}
+
+			.barOuter.v {
+				width: 18px;
+				height: 360px;
+				border-radius: 14px;
+			}
+
+			.barFillClip {
+				position: absolute;
+				inset: 0;
+				overflow: hidden;
+				border-radius: inherit;
+				z-index: 1;
+			}
+
+			.barFill {
+				position: absolute;
+				left: 0;
+				top: 0;
+				height: 100%;
+				width: 0%;
+				background: linear-gradient(
+					to bottom,
+					var(--fillLight, #7fb6ff) 0%,
+					var(--fillLight, #7fb6ff) 66.666%,
+					var(--fillDark, #2f76ff) 66.666%,
+					var(--fillDark, #2f76ff) 100%
+				);
+				border-radius: inherit;
+				z-index: 1;
+			}
+
+			.barOuter.v .barFill {
+				bottom: 0;
+				top: auto;
+				width: 100%;
+				height: 0%;
+				background: linear-gradient(
+					to bottom,
+					var(--fillDark, #7c7c7c) 0%,
+					var(--fillDark, #7c7c7c) 33.333%,
+					var(--fillLight, #b9b9b9) 33.333%,
+					var(--fillLight, #b9b9b9) 100%
+				);
+			}
+
+			.fillShade {
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+				pointer-events: none;
+				z-index: 2;
+			}
+
+			.fillShade.bottom {
+				top: auto;
+				height: 33.333%;
+				background: rgba(0,0,0,0.18);
+			}
+
+			.fillShade.top {
+				bottom: auto;
+				height: 33.333%;
+				background: rgba(0,0,0,0.16);
+			}
+
+			.fillShade.right {
+				left: auto;
+				width: 33.333%;
+				background: rgba(0,0,0,0.14);
+			}
+
+			.barOverlay {
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+				pointer-events: none;
+				z-index: 5;
+				box-shadow:
+					inset 0 1px 0 rgba(255,255,255,0.70),
+					inset 0 -1px 0 rgba(0,0,0,0.18),
+					inset 0 -3px 0 rgba(0,0,0,0.20);
+				border: 2px solid rgba(0,0,0,0.20);
+			}
+
+			.barText {
+				position: absolute;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: 900;
+				font-size: 13px;
+				line-height: 1;
+				color: rgba(255, 255, 255, 0.98);
+				user-select: none;
+				pointer-events: none;
+				z-index: 6;
+				text-shadow:
+					1px 0 rgba(0, 0, 0, 0.85),
+					-1px 0 rgba(0, 0, 0, 0.85),
+					0 1px rgba(0, 0, 0, 0.85),
+					0 -1px rgba(0, 0, 0, 0.85);
+				-webkit-font-smoothing: antialiased;
+				-moz-osx-font-smoothing: grayscale;
+				text-rendering: geometricPrecision;
+			}
+
+			#hpBarOuter { width: min(980px, calc(100vw - 48px)); }
+			#levelBarOuter { width: min(420px, calc(100vw - 48px)); height: 18px; }
+
+		</style>
+	</head>
+
+	<body>
+		<canvas id="bg"></canvas>
+		<canvas id="c"></canvas>
+
+		<div id="leaderboard" style="display:none;">
+			<div id="leaderboardHeader">Damage</div>
+			<div id="leaderboardBody"></div>
+		</div>
+
+		<div id="hudLeft" style="display:none;">
+			<div class="hudStack">
+				<div id="speedBarOuter" class="barOuter v" style="--fillLight:#ffd84a;--fillDark:#e24b2b;">
+					<div class="barFillClip">
+						<div id="speedBarInner" class="barFill"></div>
+						<div class="fillShade top"></div>
+						<div class="fillShade right"></div>
+					</div>
+					<div class="barOverlay"></div>
+				</div>
+			</div>
+		</div>
+
+		<div id="hudBottom">
+			<div id="hpBarOuter" class="barOuter h" style="--fillLight:#66ff66;--fillDark:#2fbf2f;">
+				<div class="barFillClip">
+					<div id="hpBarInner" class="barFill"></div>
+					<div class="fillShade bottom"></div>
+				</div>
+				<div class="barOverlay"></div>
+				<div id="hpBarText" class="barText">HP: 0/0</div>
+			</div>
+
+			<div id="levelBarOuter" class="barOuter h" style="--fillLight:#7fb6ff;--fillDark:#2f76ff;">
+				<div class="barFillClip">
+					<div id="levelBarInner" class="barFill"></div>
+					<div class="fillShade bottom"></div>
+				</div>
+				<div class="barOverlay"></div>
+				<div id="levelBarText" class="barText">Level: 1</div>
+			</div>
+		</div>
+
+		<div id="menu">
+			<div id="menuInner">
+				<input id="nameInput" maxlength="18" placeholder="Good luck, ... (PUT USERNAME HERE)" />
+				<button id="playBtn" class="uiBtn uiBtnBig btnOutlinedText btnGray">Play!</button>
+				<button id="tutorialBtn" class="uiBtn uiBtnMed btnOutlinedText btnGreen">Tutorial</button>
+				<button id="socialsBtn" class="uiBtn uiBtnMed btnOutlinedText btnBlue">Socials</button>
+			</div>
+		</div>
+
+		<div id="tutorialScreen">
+			<div id="tutorialPanel">
+				<div id="tutorialHeader">
+					<div id="tutorialTitle">Tutorial</div>
+					<button id="tutorialClose" class="closeBtn btnOutlinedText">✕</button>
+				</div>
+				<div id="tutorialBody">
+					<div id="tutorialText">The faster you go, the more damage you can do. Click to apply damage at your speed. If you move too fast, you get punished. Your mouse is your character.</div>
+				</div>
+			</div>
+		</div>
+
+		<div id="socialsScreen">
+			<div id="socialsPanel">
+				<div id="socialsHeader">
+					<div id="socialsTitle">Socials</div>
+					<button id="socialsClose" class="closeBtn btnOutlinedText">✕</button>
+				</div>
+				<div id="socialsBody">
+					<a class="uiLink uiBtn uiBtnBig btnOutlinedText btnBlue" id="discordBtn" href="https://discord.gg/YE4VKhRn2X" target="_blank" rel="noopener noreferrer">Discord</a>
+					<a class="uiLink uiBtn uiBtnBig btnOutlinedText btnPurple" id="xBtn" href="https://x.com/hexasixdice" target="_blank" rel="noopener noreferrer">X</a>
+				</div>
+			</div>
+		</div>
+
+		<div id="deathScreen">
+			<div id="deathCard">
+				<div id="deathSmall">You died to</div>
+				<div id="deathBig">Unknown</div>
+				<button id="continueBtn" class="uiBtn uiBtnSm btnOutlinedText btnGray">Continue</button>
+			</div>
+		</div>
+
+		<script>
+			const tutorialBtn = document.getElementById("tutorialBtn");
+			const tutorialScreen = document.getElementById("tutorialScreen");
+			const tutorialClose = document.getElementById("tutorialClose");
+
+			const socialsBtn = document.getElementById("socialsBtn");
+			const socialsScreen = document.getElementById("socialsScreen");
+			const socialsClose = document.getElementById("socialsClose");
+
+			function openTutorial() { if (tutorialScreen) tutorialScreen.style.display = "flex"; }
+			function closeTutorial() { if (tutorialScreen) tutorialScreen.style.display = "none"; }
+			function openSocials() { if (socialsScreen) socialsScreen.style.display = "flex"; }
+			function closeSocials() { if (socialsScreen) socialsScreen.style.display = "none"; }
+
+			if (tutorialBtn) tutorialBtn.addEventListener("click", openTutorial);
+			if (tutorialClose) tutorialClose.addEventListener("click", closeTutorial);
+			if (socialsBtn) socialsBtn.addEventListener("click", openSocials);
+			if (socialsClose) socialsClose.addEventListener("click", closeSocials);
+
+			if (tutorialScreen) tutorialScreen.addEventListener("click", (e) => { if (e.target === tutorialScreen) closeTutorial(); });
+			if (socialsScreen) socialsScreen.addEventListener("click", (e) => { if (e.target === socialsScreen) closeSocials(); });
+
+			window.addEventListener("keydown", (e) => {
+				if (e.key === "Escape") {
+					if (tutorialScreen && tutorialScreen.style.display === "flex") closeTutorial();
+					if (socialsScreen && socialsScreen.style.display === "flex") closeSocials();
+				}
+			});
+
+			const bg = document.getElementById("bg");
+			const bctx = bg ? bg.getContext("2d") : null;
+
+			function resizeBg() {
+				if (!bg) return;
+				bg.width = window.innerWidth;
+				bg.height = window.innerHeight;
+			}
+			window.addEventListener("resize", resizeBg);
+			resizeBg();
+
+			let ox = 0, oy = 0;
+			const spacing = 40;
+			const speed = 0.22;
+
+			function drawGrid() {
+				if (!bg || !bctx) return;
+
+				bctx.clearRect(0, 0, bg.width, bg.height);
+				bctx.fillStyle = "#ffffff";
+				bctx.fillRect(0, 0, bg.width, bg.height);
+				bctx.strokeStyle = "#e2e2e2";
+				bctx.lineWidth = 1;
+
+				ox -= speed;
+				oy -= speed;
+				if (ox <= -spacing) ox += spacing;
+				if (oy <= -spacing) oy += spacing;
+
+				for (let x = ox; x < bg.width; x += spacing) {
+					bctx.beginPath();
+					bctx.moveTo(x, 0);
+					bctx.lineTo(x, bg.height);
+					bctx.stroke();
+				}
+				for (let y = oy; y < bg.height; y += spacing) {
+					bctx.beginPath();
+					bctx.moveTo(0, y);
+					bctx.lineTo(bg.width, y);
+					bctx.stroke();
+				}
+
+				requestAnimationFrame(drawGrid);
+			}
+			drawGrid();
+		</script>
+
+		<script defer src="./main.js"></script>
+	</body>
 </html>
