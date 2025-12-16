@@ -1,3 +1,4 @@
+const hudBottom = document.getElementById("hudBottom") as HTMLDivElement | null;
 const canvas = document.getElementById("c") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
@@ -251,19 +252,18 @@ function startGame() {
   joinTimeMs = performance.now();
   resetSpeedSampler();
 
-  deathScreen.style.display = "none";
-  menu.style.display = "none";
-
-  hpHud.style.display = "block";
-  levelHud.style.display = "block";
-  speedHud.style.display = "block";
-  leaderboard.style.display = "block";
+  if (deathScreen) deathScreen.style.display = "none";
+  if (menu) menu.style.display = "none";
+  if (hudBottom) hudBottom.style.display = "flex";
+  if (leaderboard) leaderboard.style.display = "block";
 
   showRoomText();
   setRoomTextCount(null);
 
   connect();
 }
+
+
 
 playBtn.addEventListener("click", () => startGame());
 

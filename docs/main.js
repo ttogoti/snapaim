@@ -1,4 +1,5 @@
 "use strict";
+const hudBottom = document.getElementById("hudBottom");
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 const menu = document.getElementById("menu");
@@ -197,12 +198,14 @@ function startGame() {
     mouseY = window.innerHeight / 2;
     joinTimeMs = performance.now();
     resetSpeedSampler();
-    deathScreen.style.display = "none";
-    menu.style.display = "none";
-    hpHud.style.display = "block";
-    levelHud.style.display = "block";
-    speedHud.style.display = "block";
-    leaderboard.style.display = "block";
+    if (deathScreen)
+        deathScreen.style.display = "none";
+    if (menu)
+        menu.style.display = "none";
+    if (hudBottom)
+        hudBottom.style.display = "flex";
+    if (leaderboard)
+        leaderboard.style.display = "block";
     showRoomText();
     setRoomTextCount(null);
     connect();
