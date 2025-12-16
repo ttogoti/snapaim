@@ -6,8 +6,15 @@ const nameInput = document.getElementById("nameInput") as HTMLInputElement;
 const playBtn = document.getElementById("playBtn") as HTMLButtonElement;
 
 const hudBottom = document.getElementById("hudBottom") as HTMLDivElement;
+
 const levelBarInner = document.getElementById("levelBarInner") as HTMLDivElement;
 const levelBarText = document.getElementById("levelBarText") as HTMLDivElement;
+
+const hpBarInner = document.getElementById("hpBarInner") as HTMLDivElement;
+const hpBarText = document.getElementById("hpBarText") as HTMLDivElement;
+
+const speedVert = document.getElementById("speedVert") as HTMLDivElement;
+const speedVertFill = document.getElementById("speedVertFill") as HTMLDivElement;
 
 const deathScreen = document.getElementById("deathScreen") as HTMLDivElement;
 const deathBig = document.getElementById("deathBig") as HTMLDivElement;
@@ -69,14 +76,13 @@ type PlayerState = {
   y: number;
   hp: number;
   maxHp?: number;
-  kills?: number;
   damage?: number;
   level?: number;
   killsInLevel?: number;
   killsNeeded?: number;
 };
 
-type LeaderRow = { name: string; damage: number };
+type LeaderRow = { id: string; name: string; damage: number };
 
 let myId: string | null = null;
 let myName = "";
@@ -128,7 +134,7 @@ let joinTimeMs = performance.now();
 const SPEED_GRACE_MS = 650;
 
 let lastSpeedingSend = 0;
-const SPEEDING_SEND_MS = 120;
+const SPEEDING_SEND_MS = 140;
 
 function resetSpeedSampler() {
   lastSpeedT = performance.now();
@@ -187,6 +193,7 @@ function showDeathScreen(killedBy: string) {
 
   hudBottom.style.display = "none";
   leaderboard.style.display = "none";
+  speedVert.style.display = "none";
   menu.style.display = "none";
 
   deathBig.textContent = killedBy;
@@ -211,10 +218,14 @@ function resetToMenu() {
   deathScreen.style.display = "none";
   hudBottom.style.display = "none";
   leaderboard.style.display = "none";
+  speedVert.style.display = "none";
   menu.style.display = "flex";
 
   levelBarInner.style.width = "0%";
   levelBarText.textContent = "Level: 1";
+
+  hpBarInner.style.width = "0%";
+  hpBarText.textContent = "HP: 0/0";
 
   nameInput.value = "";
   nameInput.focus();
@@ -243,6 +254,7 @@ function startGame() {
   menu.style.display = "none";
   hudBottom.style.display = "flex";
   leaderboard.style.display = "block";
+  speedVert.style.display = "block";
 
   showRoomText();
   setRoomTextCount(null);
@@ -282,13 +294,16 @@ function setLeaderboard(rows: LeaderRow[] | null) {
   for (let i = 0; i < Math.min(10, rows.length); i++) {
     const r = rows[i];
     const row = document.createElement("div");
-    row.className = "lbRow";
+    row.className = "lbRow" + (myId && r.id === myId ? " lbMe" : "");
+
     const left = document.createElement("div");
     left.className = "lbName";
     left.textContent = `${i + 1}. ${String(r?.name ?? "Player")}`;
+
     const right = document.createElement("div");
     right.className = "lbDmg";
     right.textContent = `${Math.round(Number(r?.damage ?? 0)).toLocaleString()}`;
+
     row.appendChild(left);
     row.appendChild(right);
     leaderboardBody.appendChild(row);
@@ -399,26 +414,25 @@ function connect() {
         }
       }
 
-    if (myId && to === myId) {
+      if (myId && to === myId) {
         const from = msg.from;
 
         if (typeof from === "string") {
-            if (from === "speed") {
-                lastKillerName = "Speed";
-            } else {
-                const killer = players.get(from);
-                lastKillerName =
-                    (killer?.name && killer.name.trim().length)
-                        ? killer.name
-                        : from.slice(0, 4);
-            }
+          if (from === "speed") {
+            lastKillerName = "Speed";
+          } else {
+            const killer = players.get(from);
+            lastKillerName =
+              (killer?.name && killer.name.trim().length)
+                ? killer.name
+                : from.slice(0, 4);
+          }
         }
 
         if (typeof hp === "number" && hp <= 0) {
-            showDeathScreen(lastKillerName ?? "Unknown");
+          showDeathScreen(lastKillerName ?? "Unknown");
         }
-    }
-
+      }
 
       return;
     }
@@ -483,15 +497,9 @@ function roundedRect(x: number, y: number, w: number, h: number, r: number) {
   ctx.closePath();
 }
 
-function hpHueBlueYellowRed(pct: number) {
+function hpHueGreenToRed(pct: number) {
   const t = Math.max(0, Math.min(1, pct));
-  if (t >= 0.5) {
-    const u = (t - 0.5) / 0.5;
-    return 60 + (200 - 60) * u;
-  } else {
-    const u = t / 0.5;
-    return 0 + (60 - 0) * u;
-  }
+  return 120 * t;
 }
 
 function speedHueYellowToRed(pct: number) {
@@ -499,64 +507,46 @@ function speedHueYellowToRed(pct: number) {
   return 60 - 60 * t;
 }
 
-function drawMouseBars() {
-  if (!joined || isDead) return;
-  if (!myId) return;
+function updateSpeedVert() {
+  const pct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
+  speedVertFill.style.height = `${pct * 100}%`;
+  const h = speedHueYellowToRed(pct);
+  speedVertFill.style.background = `hsl(${h}, 95%, 55%)`;
+}
+
+function updateBottomBars() {
+  if (!joined || !myId) {
+    hpBarInner.style.width = "0%";
+    hpBarText.textContent = "HP: 0/0";
+    levelBarInner.style.width = "0%";
+    levelBarText.textContent = "Level: 1";
+    return;
+  }
 
   const me = players.get(myId);
   if (!me) return;
 
   const maxHp = maxHpForPlayer(me);
   const hpPct = Math.max(0, Math.min(1, me.hp / maxHp));
-  const spPct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
 
-  const w = 112;
-  const h = 9;
-  const r = 6;
+  hpBarInner.style.width = `${hpPct * 100}%`;
+  const hh = hpHueGreenToRed(hpPct);
+  hpBarInner.style.background = `hsl(${hh}, 95%, 45%)`;
+  hpBarText.textContent = `HP: ${Math.round(me.hp).toLocaleString()}/${Math.round(maxHp).toLocaleString()}`;
 
-  const hpX = mouseX - w / 2;
-  const hpY = mouseY - hitRadius - 18;
+  const level = typeof me.level === "number" && isFinite(me.level) ? me.level : 1;
+  const inLvl = typeof me.killsInLevel === "number" && isFinite(me.killsInLevel) ? me.killsInLevel : 0;
+  const need = typeof me.killsNeeded === "number" && isFinite(me.killsNeeded) && me.killsNeeded > 0 ? me.killsNeeded : 3;
 
-  ctx.save();
-
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  roundedRect(hpX, hpY, w, h, r);
-  ctx.fill();
-
-  const hpW = w * hpPct;
-  if (hpW > 0) {
-    const hh = hpHueBlueYellowRed(hpPct);
-    ctx.fillStyle = `hsl(${hh}, 95%, 55%)`;
-    roundedRect(hpX, hpY, hpW, h, r);
-    ctx.fill();
+  const pct = Math.max(0, Math.min(1, inLvl / need));
+  if (pct <= 0) {
+    levelBarInner.style.width = "14px";
+  } else {
+    levelBarInner.style.width = `${pct * 100}%`;
   }
 
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = "rgba(55,55,55,0.95)";
-  roundedRect(hpX, hpY, w, h, r);
-  ctx.stroke();
-
-  const spX = mouseX - w / 2;
-  const spY = mouseY - hitRadius + 10;
-
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  roundedRect(spX, spY, w, h, r);
-  ctx.fill();
-
-  const spW = w * spPct;
-  if (spW > 0) {
-    const sh = speedHueYellowToRed(spPct);
-    ctx.fillStyle = `hsl(${sh}, 95%, 55%)`;
-    roundedRect(spX, spY, spW, h, r);
-    ctx.fill();
-  }
-
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = "rgba(55,55,55,0.95)";
-  roundedRect(spX, spY, w, h, r);
-  ctx.stroke();
-
-  ctx.restore();
+  levelBarInner.style.background = "linear-gradient(to bottom, #7fb6ff 0%, #7fb6ff 66.666%, #2f76ff 66.666%, #2f76ff 100%)";
+  levelBarText.textContent = `Level: ${level}`;
 }
 
 function drawOtherHpBar(x: number, y: number, p: PlayerState) {
@@ -576,14 +566,10 @@ function drawOtherHpBar(x: number, y: number, p: PlayerState) {
   roundedRect(bx, by, w, h, r);
   ctx.fill();
 
-  let c = "#3ddc84";
-  if (pct > 0.6) c = "#3ddc84";
-  else if (pct > 0.3) c = "#f5c542";
-  else c = "#ff4d4d";
-
   const fw = w * pct;
   if (fw > 0) {
-    ctx.fillStyle = c;
+    const hh = hpHueGreenToRed(pct);
+    ctx.fillStyle = `hsl(${hh}, 95%, 45%)`;
     roundedRect(bx, by, fw, h, r);
     ctx.fill();
   }
@@ -598,8 +584,6 @@ function drawOtherHpBar(x: number, y: number, p: PlayerState) {
 
 function drawOtherLabel(x: number, y: number, p: PlayerState) {
   const name = (p.name && p.name.trim().length) ? p.name : p.id.slice(0, 4);
-  const kills = typeof p.kills === "number" ? p.kills : 0;
-
   const baseY = y + hitRadius + 14;
 
   ctx.save();
@@ -610,61 +594,11 @@ function drawOtherLabel(x: number, y: number, p: PlayerState) {
   ctx.lineWidth = 3;
   ctx.strokeStyle = "rgba(55,55,55,0.95)";
   ctx.strokeText(name, x, baseY);
+
   ctx.fillStyle = "rgba(255,255,255,0.92)";
   ctx.fillText(name, x, baseY);
 
-  const line2Y = baseY + 14;
-
-  const numText = `${kills}`;
-  const suffix = " kills";
-  ctx.font = "800 12px Ubuntu, system-ui";
-  const numW = ctx.measureText(numText).width;
-  ctx.font = "12px Ubuntu, system-ui";
-  const sufW = ctx.measureText(suffix).width;
-  const totalW = numW + sufW;
-  const startX = x - totalW / 2;
-
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "rgba(55,55,55,0.95)";
-  ctx.font = "800 12px Ubuntu, system-ui";
-  ctx.strokeText(numText, startX + numW / 2, line2Y);
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
-  ctx.fillText(numText, startX + numW / 2, line2Y);
-
-  ctx.font = "12px Ubuntu, system-ui";
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = "rgba(55,55,55,0.95)";
-  ctx.strokeText(suffix, startX + numW + sufW / 2, line2Y);
-  ctx.fillStyle = "rgba(255,255,255,0.92)";
-  ctx.fillText(suffix, startX + numW + sufW / 2, line2Y);
-
   ctx.restore();
-}
-
-function updateLevelBar() {
-  if (!joined || !myId) {
-    levelBarInner.style.width = "0%";
-    levelBarText.textContent = "Level: 1";
-    return;
-  }
-
-  const me = players.get(myId);
-  if (!me) return;
-
-  const level = typeof me.level === "number" && isFinite(me.level) ? me.level : 1;
-  const inLvl = typeof me.killsInLevel === "number" && isFinite(me.killsInLevel) ? me.killsInLevel : 0;
-  const need = typeof me.killsNeeded === "number" && isFinite(me.killsNeeded) && me.killsNeeded > 0 ? me.killsNeeded : 3;
-
-  const pct = Math.max(0, Math.min(1, inLvl / need));
-
-  if (pct <= 0) {
-    levelBarInner.style.width = "14px";
-} else {
-    levelBarInner.style.width = `${pct * 100}%`;
-}
-
-  levelBarInner.style.background = "linear-gradient(to bottom, #7fb6ff 0%, #7fb6ff 66.666%, #2f76ff 66.666%, #2f76ff 100%)";
-  levelBarText.textContent = `Level: ${level}`;
 }
 
 function loop() {
@@ -686,7 +620,7 @@ function loop() {
     ctx.save();
     ctx.beginPath();
     ctx.arc(x, y, hitRadius, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(90,240,150,0.95)";
+    ctx.fillStyle = "rgba(255, 70, 70, 0.95)";
     ctx.fill();
     ctx.restore();
 
@@ -694,8 +628,8 @@ function loop() {
     drawOtherLabel(x, y, p);
   }
 
-  drawMouseBars();
-  updateLevelBar();
+  updateSpeedVert();
+  updateBottomBars();
 
   requestAnimationFrame(loop);
 }
