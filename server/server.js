@@ -9,13 +9,12 @@ const server = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server });
 const players = new Map();
 const sockets = new Map();
-const lastPong = new Map();
 const HIT_RADIUS = 22;
 const SPEED_MAX = 2000;
-const SPEED_MAX_CAP = 3500;
 const SPEED_PENALTY_DMG = 4999;
 const SPEED_PENALTY_COOLDOWN_MS = 2000;
 const MAXHP_STEP = 5000;
+const STALE_MS = 6000;
 function now() {
     return Date.now();
 }
@@ -28,7 +27,7 @@ function safeName(n) {
     return c.length ? c : "Player";
 }
 function send(ws, obj) {
-    if (ws.readyState !== 1)
+    if (!ws || ws.readyState !== 1)
         return;
     ws.send(JSON.stringify(obj));
 }
@@ -41,54 +40,53 @@ function broadcast(obj) {
 }
 function leaderboardTop10() {
     const arr = Array.from(players.values()).map(p => ({
+        id: p.id,
         name: p.name || id4(p.id),
         damage: p.damage
     }));
     arr.sort((a, b) => b.damage - a.damage);
     return arr.slice(0, 10);
 }
-function killsNeededForLevel(level) {
-    if (level <= 1)
-        return 3;
-    let need = 3;
-    for (let l = 2; l <= level; l++)
-        need = Math.floor(need * 1.5);
-    return Math.max(1, need);
+function applyLevelProgress(attacker) {
+    attacker.killsInLevel += 1;
+    if (attacker.killsInLevel >= attacker.killsNeeded) {
+        const pct = attacker.maxHp > 0 ? attacker.hp / attacker.maxHp : 1;
+        attacker.level += 1;
+        attacker.killsInLevel = 0;
+        attacker.killsNeeded = Math.max(1, Math.floor(attacker.killsNeeded * 1.5));
+        attacker.maxHp += MAXHP_STEP;
+        attacker.hp = Math.max(1, Math.round(pct * attacker.maxHp));
+    }
 }
-function applyLevelUp(p) {
-    const pct = p.maxHp > 0 ? p.hp / p.maxHp : 1;
-    p.maxHp += MAXHP_STEP;
-    p.hp = Math.max(1, Math.round(pct * p.maxHp));
-}
-function applyDamage(attacker, target, dmg) {
+function applyDamage(attacker, target, dmg, fromId) {
     const before = target.hp;
     const applied = Math.max(0, Math.min(before, Math.floor(dmg)));
     if (applied <= 0)
         return;
     target.hp = Math.max(0, before - applied);
     attacker.damage += applied;
-    broadcast({ t: "hit", from: attacker.id, to: target.id, hp: target.hp, maxHp: target.maxHp });
-    if (target.hp > 0)
-        return;
-    attacker.kills += 1;
-    attacker.killsInLevel += 1;
-    if (attacker.killsInLevel >= attacker.killsNeeded) {
-        attacker.killsInLevel = 0;
-        attacker.level += 1;
-        attacker.killsNeeded = killsNeededForLevel(attacker.level);
-        applyLevelUp(attacker);
+    broadcast({ t: "hit", from: fromId ?? attacker.id, to: target.id, hp: target.hp, maxHp: target.maxHp });
+    if (target.hp <= 0) {
+        applyLevelProgress(attacker);
         broadcast({ t: "hit", from: attacker.id, to: attacker.id, hp: attacker.hp, maxHp: attacker.maxHp });
+        const byName = attacker.name || id4(attacker.id);
+        const toWs = Array.from(sockets.entries()).find(([, pid]) => pid === target.id)?.[0];
+        if (toWs)
+            send(toWs, { t: "dead", byName });
     }
-    const byName = attacker.name || id4(attacker.id);
-    const toWs = Array.from(sockets.entries()).find(([, pid]) => pid === target.id)?.[0];
-    if (toWs)
-        send(toWs, { t: "dead", byName });
 }
 function getPlayerFromWs(ws) {
     const id = sockets.get(ws);
     if (!id)
         return null;
     return players.get(id) || null;
+}
+function removeByWs(ws) {
+    const pid = sockets.get(ws);
+    if (!pid)
+        return;
+    sockets.delete(ws);
+    players.delete(pid);
 }
 wss.on("connection", (ws) => {
     const id = crypto.randomBytes(8).toString("hex");
@@ -100,11 +98,10 @@ wss.on("connection", (ws) => {
         y: 0,
         hp: 10000,
         maxHp: 10000,
-        kills: 0,
-        damage: 0,
         level: 1,
         killsInLevel: 0,
         killsNeeded: 3,
+        damage: 0,
         lastMoveT: t,
         lastMoveX: 0,
         lastMoveY: 0,
@@ -114,14 +111,15 @@ wss.on("connection", (ws) => {
     };
     players.set(id, p);
     sockets.set(ws, id);
-    lastPong.set(ws, t);
-    try {
-        ws.on("pong", () => {
-            lastPong.set(ws, now());
-        });
-    }
-    catch { }
-    send(ws, { t: "welcome", id, hitRadius: HIT_RADIUS, speedMax: SPEED_MAX, roomCount: players.size });
+    send(ws, {
+        t: "welcome",
+        id,
+        hitRadius: HIT_RADIUS,
+        speedMax: SPEED_MAX,
+        roomCount: players.size,
+        hp: p.hp,
+        maxHp: p.maxHp
+    });
     ws.on("message", (buf) => {
         let msg;
         try {
@@ -189,43 +187,18 @@ wss.on("connection", (ws) => {
             }
             if (!best)
                 return;
-            const dmg = Math.max(1, Math.floor(Math.min(me.speed, SPEED_MAX_CAP)));
+            const dmg = Math.max(1, Math.floor(Math.min(me.speed, 3500)));
             applyDamage(me, best, dmg);
             return;
         }
     });
     ws.on("close", () => {
-        const pid = sockets.get(ws);
-        if (pid)
-            players.delete(pid);
-        sockets.delete(ws);
-        lastPong.delete(ws);
+        removeByWs(ws);
     });
-    ws.on("error", () => { });
+    ws.on("error", () => {
+        removeByWs(ws);
+    });
 });
-setInterval(() => {
-    const t = now();
-    for (const ws of Array.from(lastPong.keys())) {
-        const lp = lastPong.get(ws) ?? 0;
-        if (t - lp > 12000) {
-            try {
-                ws.terminate();
-            }
-            catch { }
-            const pid = sockets.get(ws);
-            if (pid)
-                players.delete(pid);
-            sockets.delete(ws);
-            lastPong.delete(ws);
-        }
-        else {
-            try {
-                ws.ping();
-            }
-            catch { }
-        }
-    }
-}, 3000);
 setInterval(() => {
     const list = Array.from(players.values()).map(p => ({
         id: p.id,
@@ -234,11 +207,10 @@ setInterval(() => {
         y: p.y,
         hp: p.hp,
         maxHp: p.maxHp,
-        kills: p.kills,
-        damage: p.damage,
         level: p.level,
         killsInLevel: p.killsInLevel,
-        killsNeeded: p.killsNeeded
+        killsNeeded: p.killsNeeded,
+        damage: p.damage
     }));
     broadcast({
         t: "state",
@@ -247,4 +219,26 @@ setInterval(() => {
         leaderboard: leaderboardTop10()
     });
 }, 50);
+setInterval(() => {
+    const tNow = now();
+    for (const [ws, pid] of sockets.entries()) {
+        const p = players.get(pid);
+        if (!p) {
+            try {
+                ws.terminate?.();
+            }
+            catch { }
+            sockets.delete(ws);
+            continue;
+        }
+        if (tNow - p.lastSeen > STALE_MS) {
+            players.delete(pid);
+            sockets.delete(ws);
+            try {
+                ws.terminate?.();
+            }
+            catch { }
+        }
+    }
+}, 1500);
 server.listen(PORT);
