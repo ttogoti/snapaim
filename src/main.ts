@@ -724,26 +724,25 @@ function drawCircleOutline(x: number, y: number, r: number, color: string, lw: n
 function drawTriangle(x: number, y: number, ang: number, size: number, color: string) {
 	if (!ctx) return;
 
-	const c = Math.cos(ang);
-	const s = Math.sin(ang);
+	const r = size;
+	const a0 = ang;
+	const a1 = ang + (Math.PI * 2) / 3;
+	const a2 = ang + (Math.PI * 4) / 3;
 
-	const p1x = x + c * size;
-	const p1y = y + s * size;
+	const p0x = x + Math.cos(a0) * r;
+	const p0y = y + Math.sin(a0) * r;
 
-	const bx = x - c * (size * 0.65);
-	const by = y - s * (size * 0.65);
+	const p1x = x + Math.cos(a1) * r;
+	const p1y = y + Math.sin(a1) * r;
 
-	const lx = bx + (-s) * (size * 0.62);
-	const ly = by + (c) * (size * 0.62);
-
-	const rx = bx + (s) * (size * 0.62);
-	const ry = by + (-c) * (size * 0.62);
+	const p2x = x + Math.cos(a2) * r;
+	const p2y = y + Math.sin(a2) * r;
 
 	ctx.save();
 	ctx.beginPath();
-	ctx.moveTo(p1x, p1y);
-	ctx.lineTo(lx, ly);
-	ctx.lineTo(rx, ry);
+	ctx.moveTo(p0x, p0y);
+	ctx.lineTo(p1x, p1y);
+	ctx.lineTo(p2x, p2y);
 	ctx.closePath();
 	ctx.fillStyle = color;
 	ctx.fill();
@@ -820,10 +819,11 @@ function loop(t: number) {
 		ctx.fill();
 		ctx.restore();
 
-		drawCircleOutline(bx, by, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
+		if (!isMe) drawCircleOutline(bx, by, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
 
 		const ang = Math.atan2(my - by, mx - bx);
 		drawTriangle(bx, by, ang, 18, "rgba(40,200,80,0.95)");
+
 
 		if (!isMe) {
 			drawOtherHealthbar(mx, my, p);
