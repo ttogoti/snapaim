@@ -18,7 +18,9 @@ const speedFill = document.getElementById("speedFill") as HTMLDivElement | null;
 
 const deathScreen = document.getElementById("deathScreen") as HTMLDivElement | null;
 const deathBig = document.getElementById("deathBig") as HTMLDivElement | null;
+const deathStats = document.getElementById("deathStats") as HTMLDivElement | null;
 const continueBtn = document.getElementById("continueBtn") as HTMLButtonElement | null;
+const menuBtn = document.getElementById("menuBtn") as HTMLButtonElement | null;
 
 const leaderboard = document.getElementById("leaderboard") as HTMLDivElement | null;
 const leaderboardBody = document.getElementById("leaderboardBody") as HTMLDivElement | null;
@@ -131,6 +133,7 @@ let lastSpeedT = performance.now();
 let lastSpeedX = mouseX;
 let lastSpeedY = mouseY;
 let smoothSpeed = 0;
+let peakSpeed = 0;
 
 let joinTimeMs = performance.now();
 const SPEED_GRACE_MS = 650;
@@ -143,6 +146,7 @@ function resetSpeedSampler() {
 	lastSpeedX = mouseX;
 	lastSpeedY = mouseY;
 	smoothSpeed = 0;
+	peakSpeed = 0;
 	lastSpeedingSend = 0;
 }
 
@@ -158,6 +162,8 @@ function updateSpeedFromMouse() {
 	const instant = (d / dt) * 1000;
 	const alpha = 0.18;
 	smoothSpeed += (instant - smoothSpeed) * alpha;
+
+	if (smoothSpeed > peakSpeed) peakSpeed = smoothSpeed;
 
 	lastSpeedT = tNow;
 	lastSpeedX = mouseX;
@@ -177,12 +183,6 @@ function updateSpeedFromMouse() {
 
 let lastKillerName: string | null = null;
 
-
-function unlockMouseNow() {
-	try { document.exitPointerLock(); } catch {}
-}
-
-
 function stopConnection() {
 	if (heartbeat !== null) {
 		clearInterval(heartbeat);
@@ -192,26 +192,42 @@ function stopConnection() {
 	ws = null;
 }
 
+let pointerLocked = false;
+
+document.addEventListener("pointerlockchange", () => {
+	pointerLocked = document.pointerLockElement === canvas;
+});
+
+function lockMouseNow() {
+	if (!canvas) return;
+	try { canvas.requestPointerLock(); } catch {}
+}
+
 function showDeathScreen(killedBy: string) {
 	if (isDead) return;
 	isDead = true;
 
-	unlockMouseNow();
 	stopConnection();
 	hideRoomText();
-
 
 	if (hudBottom) hudBottom.style.display = "none";
 	if (speedHud) speedHud.style.display = "none";
 	if (leaderboard) leaderboard.style.display = "none";
 	if (menu) menu.style.display = "none";
 
+	const me = myId ? players.get(myId) : null;
+	const dmg = me && typeof me.damage === "number" && isFinite(me.damage) ? me.damage : 0;
+	const pk = Math.max(0, Math.round(peakSpeed));
+	const mx = SPEED_MAX > 0 ? Math.max(0, Math.min(100, Math.round((peakSpeed / SPEED_MAX) * 100))) : 0;
+
 	if (deathBig) deathBig.textContent = killedBy;
+	if (deathStats) {
+		deathStats.textContent = `Damage dealt: ${Math.round(dmg).toLocaleString()}   Peak speed: ${pk.toLocaleString()} (${mx}%)`;
+	}
 	if (deathScreen) deathScreen.style.display = "flex";
 }
 
 function resetToMenu() {
-	unlockMouseNow();
 	stopConnection();
 
 	hideRoomText();
@@ -240,14 +256,51 @@ function resetToMenu() {
 
 	if (speedFill) speedFill.style.height = "0%";
 
+	if (deathStats) deathStats.textContent = "";
+
 	if (nameInput) {
 		nameInput.value = "";
 		nameInput.focus();
 	}
 }
 
+function respawnNow() {
+	if (deathScreen) deathScreen.style.display = "none";
+
+	isDead = false;
+	joined = false;
+	myId = null;
+	myMaxHp = null;
+	lastKillerName = null;
+	players.clear();
+	smooth.clear();
+
+	resetSpeedSampler();
+
+	if (hudBottom) hudBottom.style.display = "flex";
+	if (speedHud) speedHud.style.display = "block";
+	if (leaderboard) leaderboard.style.display = "block";
+	if (menu) menu.style.display = "none";
+
+	showRoomText();
+	setRoomTextCount(null);
+
+	joinTimeMs = performance.now();
+
+	lockMouseNow();
+	requestAnimationFrame(() => lockMouseNow());
+
+	connect();
+}
+
 if (continueBtn) {
 	continueBtn.addEventListener("click", () => {
+		respawnNow();
+	});
+}
+
+if (menuBtn) {
+	menuBtn.addEventListener("click", () => {
 		resetToMenu();
 	});
 }
@@ -255,12 +308,11 @@ if (continueBtn) {
 if (nameInput) nameInput.focus();
 
 const CONTROL_RADIUS = 110;
-const BODY_SPEED = 300;
+const BODY_SPEED = 360;
 
 let bodyX = window.innerWidth / 2;
 let bodyY = window.innerHeight / 2;
 
-let pointerLocked = false;
 let wDown = false;
 let aDown = false;
 let sDown = false;
@@ -313,21 +365,15 @@ function startGame() {
 	showRoomText();
 	setRoomTextCount(null);
 
+	lockMouseNow();
+	requestAnimationFrame(() => lockMouseNow());
+
 	connect();
 }
 
-function lockMouseNow() {
-	if (!canvas) return;
-	try { canvas.requestPointerLock(); } catch {}
-}
-
-
 if (playBtn) playBtn.addEventListener("click", () => {
 	startGame();
-	lockMouseNow();
-	requestAnimationFrame(() => lockMouseNow());
 });
-
 
 if (nameInput) {
 	nameInput.addEventListener("keydown", (e) => {
@@ -393,11 +439,6 @@ function setLeaderboard(rows: LeaderRow[] | null) {
 		leaderboardBody.appendChild(row);
 	}
 }
-
-document.addEventListener("pointerlockchange", () => {
-	pointerLocked = document.pointerLockElement === canvas;
-});
-
 
 function connect() {
 	ws = new WebSocket(WS_URL);
@@ -503,8 +544,17 @@ function connect() {
 			if (typeof to === "string") {
 				const target = players.get(to);
 				if (target) {
+					const oldHp = typeof target.hp === "number" ? target.hp : 0;
+
 					if (typeof hp === "number") target.hp = hp;
 					if (typeof maxHp === "number" && maxHp > 0) target.maxHp = maxHp;
+
+					if (typeof hp === "number") {
+						const d = Math.max(0, Math.round(oldHp - hp));
+						if (d > 0) spawnDamage(to, d);
+					}
+
+					if (typeof hp === "number" && hp < oldHp) flashHit(to);
 				}
 			}
 
@@ -575,18 +625,16 @@ document.addEventListener("pointermove", (e) => {
 	}
 });
 
-
-
 canvas?.addEventListener("pointerdown", (e) => {
 	if (!pointerLocked) {
-		try { canvas.requestPointerLock(); } catch {}
+		lockMouseNow();
+		requestAnimationFrame(() => lockMouseNow());
 	}
 
 	if (!ws || ws.readyState !== WebSocket.OPEN) return;
 	clampMouseToCircle();
 	wsSend({ t: "click", x: mouseX, y: mouseY });
 });
-
 
 function maxHpForPlayer(p: PlayerState) {
 	if (typeof p.maxHp === "number" && p.maxHp > 0) return p.maxHp;
@@ -696,24 +744,6 @@ function drawOtherLabel(x: number, y: number, p: PlayerState) {
 	ctx.restore();
 }
 
-function drawMyCursor(x: number, y: number) {
-	if (!ctx) return;
-
-	ctx.save();
-	ctx.beginPath();
-	ctx.arc(x, y, 5, 0, Math.PI * 2);
-	ctx.fillStyle = "rgba(235,70,70,0.95)";
-	ctx.fill();
-
-	ctx.beginPath();
-	ctx.arc(x, y, 8, 0, Math.PI * 2);
-	ctx.strokeStyle = "rgba(0,0,0,0.25)";
-	ctx.lineWidth = 2;
-	ctx.stroke();
-	ctx.restore();
-}
-
-
 function drawOtherHealthbar(x: number, y: number, p: PlayerState) {
 	if (!ctx) return;
 
@@ -805,10 +835,132 @@ function drawTriangle(x: number, y: number, ang: number, size: number, color: st
 	ctx.restore();
 }
 
+function drawMyCursor(x: number, y: number) {
+	if (!ctx) return;
+
+	ctx.save();
+	ctx.beginPath();
+	ctx.arc(x, y, 5, 0, Math.PI * 2);
+	ctx.fillStyle = "rgba(235,70,70,0.95)";
+	ctx.fill();
+
+	ctx.beginPath();
+	ctx.arc(x, y, 8, 0, Math.PI * 2);
+	ctx.strokeStyle = "rgba(0,0,0,0.28)";
+	ctx.lineWidth = 2;
+	ctx.stroke();
+	ctx.restore();
+}
+
+type Popup = { id: string; v: number; t0: number; dur: number };
+const popups = new Map<string, Popup[]>();
+const hitFlashUntil = new Map<string, number>();
+
+function flashHit(id: string) {
+	hitFlashUntil.set(id, performance.now() + 120);
+}
+
+function spawnDamage(id: string, v: number) {
+	const arr = popups.get(id) ?? [];
+	arr.push({ id: `${performance.now()}_${Math.random()}`, v, t0: performance.now(), dur: 650 });
+	popups.set(id, arr);
+}
+
+function drawPopups(id: string, x: number, y: number) {
+	if (!ctx) return;
+
+	const arr = popups.get(id);
+	if (!arr || !arr.length) return;
+
+	const now = performance.now();
+	const keep: Popup[] = [];
+
+	for (let i = 0; i < arr.length; i++) {
+		const p = arr[i];
+		const t = (now - p.t0) / p.dur;
+		if (t >= 1) continue;
+
+		keep.push(p);
+
+		const up = 18 + t * 26;
+		const alpha = Math.max(0, Math.min(1, 1 - t));
+		const sx = x + (i % 2 === 0 ? -10 : 10);
+		const sy = y - hitRadius - up;
+
+		ctx.save();
+		ctx.globalAlpha = alpha;
+		ctx.textAlign = "center";
+		ctx.textBaseline = "alphabetic";
+
+		ctx.font = "900 12px Ubuntu, system-ui";
+		ctx.lineWidth = 3;
+		ctx.strokeStyle = "rgba(55,55,55,0.95)";
+		ctx.strokeText(`${p.v.toLocaleString()}`, sx, sy);
+		ctx.fillStyle = "rgba(255,255,255,0.95)";
+		ctx.fillText(`${p.v.toLocaleString()}`, sx, sy);
+
+		ctx.restore();
+	}
+
+	if (keep.length) popups.set(id, keep);
+	else popups.delete(id);
+}
+
+const trail: { x: number; y: number; t: number }[] = [];
+const TRAIL_MAX = 26;
+
+function pushTrail(x: number, y: number) {
+	const now = performance.now();
+	trail.push({ x, y, t: now });
+	while (trail.length > TRAIL_MAX) trail.shift();
+}
+
+function drawTrail() {
+	if (!ctx) return;
+
+	const now = performance.now();
+	for (let i = 0; i < trail.length; i++) {
+		const p = trail[i];
+		const age = now - p.t;
+		const a = Math.max(0, Math.min(1, 1 - age / 220));
+		if (a <= 0) continue;
+
+		ctx.save();
+		ctx.globalAlpha = a * 0.35;
+		ctx.beginPath();
+		ctx.arc(p.x, p.y, 6 + (1 - a) * 6, 0, Math.PI * 2);
+		ctx.fillStyle = "rgba(235,70,70,0.95)";
+		ctx.fill();
+		ctx.restore();
+	}
+}
+
+function drawDangerVignette(spPct: number, t: number) {
+	if (!ctx || !canvas) return;
+	const k = Math.max(0, Math.min(1, (spPct - 0.82) / 0.18));
+	if (k <= 0) return;
+
+	const pulse = 0.5 + 0.5 * Math.sin(t * 0.012);
+	const a = k * (0.18 + 0.18 * pulse);
+
+	ctx.save();
+	ctx.globalAlpha = a;
+	const g = ctx.createRadialGradient(canvas.width * 0.5, canvas.height * 0.5, 0, canvas.width * 0.5, canvas.height * 0.5, Math.max(canvas.width, canvas.height) * 0.62);
+	g.addColorStop(0, "rgba(0,0,0,0)");
+	g.addColorStop(0.55, "rgba(0,0,0,0)");
+	g.addColorStop(1, "rgba(235,70,70,1)");
+	ctx.fillStyle = g;
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+	ctx.restore();
+}
+
 function loop(t: number) {
 	if (!canvas || !ctx) return;
 
-	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	const spPct = SPEED_MAX > 0 ? Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX)) : 0;
+
+	const dt = typeof (loop as any)._lt === "number" ? Math.min(0.05, (t - (loop as any)._lt) / 1000) : 0;
+	(loop as any)._lt = t;
 
 	const SMOOTH = 0.18;
 	for (const s of smooth.values()) {
@@ -817,9 +969,6 @@ function loop(t: number) {
 		s.bx += (s.tbx - s.bx) * SMOOTH;
 		s.by += (s.tby - s.by) * SMOOTH;
 	}
-
-	const dt = typeof (loop as any)._lt === "number" ? Math.min(0.05, (t - (loop as any)._lt) / 1000) : 0;
-	(loop as any)._lt = t;
 
 	const prevBX = bodyX;
 	const prevBY = bodyY;
@@ -853,22 +1002,33 @@ function loop(t: number) {
 		clampMouseToCircle();
 	}
 
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+	const shakeK = joined && !isDead ? Math.max(0, Math.min(1, (spPct - 0.88) / 0.12)) : 0;
+	const shakePulse = 0.5 + 0.5 * Math.sin(t * 0.09);
+	const shake = shakeK * (1.2 + 1.8 * shakePulse);
+
+	ctx.save();
+	if (shake > 0) {
+		const sx = (Math.random() * 2 - 1) * shake;
+		const sy = (Math.random() * 2 - 1) * shake;
+		ctx.translate(sx, sy);
+	}
+
+	if (joined && !isDead) {
+		if (spPct > 0.78) pushTrail(mouseX, mouseY);
+		drawTrail();
+	}
+
 	for (const p of players.values()) {
 		const isMe = myId && p.id === myId;
 		if (!isMe) continue;
 
-		const mx = mouseX;
-		const my = mouseY;
+		drawCircleOutline(bodyX, bodyY, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
 
-		const bx = bodyX;
-		const by = bodyY;
-
-		drawCircleOutline(bx, by, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
-
-		const ang = Math.atan2(my - by, mx - bx);
-		drawTriangle(bx, by, ang, 18, "rgba(40,200,80,0.95)");
+		const ang = Math.atan2(mouseY - bodyY, mouseX - bodyX);
+		drawTriangle(bodyX, bodyY, ang, 18, "rgba(40,200,80,0.95)");
 	}
-
 
 	for (const p of players.values()) {
 		const isMe = myId && p.id === myId;
@@ -878,19 +1038,35 @@ function loop(t: number) {
 		const my = isMe ? mouseY : (s ? s.y : p.y);
 
 		if (!isMe) {
-			drawOtherHealthbar(mx, my, p);
-			drawOtherLabel(mx, my, p);
-
 			ctx.save();
 			ctx.beginPath();
 			ctx.arc(mx, my, hitRadius, 0, Math.PI * 2);
 			ctx.fillStyle = "rgba(235,70,70,0.95)";
 			ctx.fill();
 			ctx.restore();
+
+			const until = hitFlashUntil.get(p.id) ?? 0;
+			if (performance.now() < until) {
+				ctx.save();
+				ctx.globalAlpha = 0.55;
+				ctx.beginPath();
+				ctx.arc(mx, my, hitRadius + 2, 0, Math.PI * 2);
+				ctx.fillStyle = "rgba(255,255,255,1)";
+				ctx.fill();
+				ctx.restore();
+			}
+
+			drawOtherHealthbar(mx, my, p);
+			drawOtherLabel(mx, my, p);
+			drawPopups(p.id, mx, my);
 		} else {
 			drawMyCursor(mx, my);
 		}
 	}
+
+	ctx.restore();
+
+	drawDangerVignette(spPct, t);
 
 	updateHudBars();
 	requestAnimationFrame(loop);

@@ -432,6 +432,25 @@
 				margin-top: -6px;
 			}
 
+			#deathStats {
+				font-size: 13px;
+				font-weight: 900;
+				color: rgba(0,0,0,0.72);
+				text-align: center;
+				white-space: pre-wrap;
+				line-height: 1.35;
+				margin-top: -2px;
+				margin-bottom: 6px;
+			}
+
+			#deathBtns {
+				display: flex;
+				gap: 10px;
+				align-items: center;
+				justify-content: center;
+				width: 100%;
+			}
+
 			#tutorialPanel, #socialsPanel {
 				width: calc(100vw - 80px);
 				height: calc(100vh - 80px);
@@ -597,7 +616,11 @@
 			<div id="deathCard">
 				<div id="deathSmall">You died to</div>
 				<div id="deathBig">Unknown</div>
-				<button id="continueBtn" class="uiBtn uiBtnSm btnOutlinedText btnGray">Continue</button>
+				<div id="deathStats"></div>
+				<div id="deathBtns">
+					<button id="continueBtn" class="uiBtn uiBtnSm btnOutlinedText btnGray">Respawn</button>
+					<button id="menuBtn" class="uiBtn uiBtnSm btnOutlinedText btnGray">Menu</button>
+				</div>
 			</div>
 		</div>
 
