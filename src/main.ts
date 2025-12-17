@@ -246,7 +246,7 @@ if (continueBtn) {
 if (nameInput) nameInput.focus();
 
 const CONTROL_RADIUS = 110;
-const BODY_SPEED = 520;
+const BODY_SPEED = 300;
 
 let bodyX = window.innerWidth / 2;
 let bodyY = window.innerHeight / 2;
@@ -846,24 +846,20 @@ function loop(t: number) {
 
 	for (const p of players.values()) {
 		const isMe = myId && p.id === myId;
+		if (!isMe) continue;
 
-		const s = !isMe ? smooth.get(p.id) : null;
-		const mx = isMe ? mouseX : (s ? s.x : p.x);
-		const my = isMe ? mouseY : (s ? s.y : p.y);
+		const mx = mouseX;
+		const my = mouseY;
 
-		const bx = isMe
-			? bodyX
-			: (s ? s.bx : (typeof p.bx === "number" && isFinite(p.bx) ? p.bx : p.x));
-
-		const by = isMe
-			? bodyY
-			: (s ? s.by : (typeof p.by === "number" && isFinite(p.by) ? p.by : p.y));
+		const bx = bodyX;
+		const by = bodyY;
 
 		drawCircleOutline(bx, by, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
 
 		const ang = Math.atan2(my - by, mx - bx);
 		drawTriangle(bx, by, ang, 18, "rgba(40,200,80,0.95)");
 	}
+
 
 	for (const p of players.values()) {
 		const isMe = myId && p.id === myId;
