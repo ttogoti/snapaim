@@ -547,11 +547,8 @@ function drawOtherHealthbar(x, y, p) {
         ctx.closePath();
     };
     ctx.save();
-    rr(bx - 1, by - 1, w + 2, h + 2, r + 1);
-    ctx.fillStyle = "rgba(255,255,255,0.92)";
-    ctx.fill();
     rr(bx, by, w, h, r);
-    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.fillStyle = "#000";
     ctx.fill();
     const fw = Math.max(0, w * hpPct);
     if (fw > 0) {
@@ -559,13 +556,13 @@ function drawOtherHealthbar(x, y, p) {
         ctx.fillStyle = `hsl(${hh}, 85%, 55%)`;
         ctx.fill();
         ctx.globalAlpha = 0.28;
-        ctx.fillStyle = "rgba(0,0,0,1)";
-        ctx.fillRect(bx, by + h * 0.66, fw, h * 0.34);
+        ctx.fillStyle = "#000";
+        ctx.fillRect(bx, by + h * 0.65, fw, h * 0.35);
         ctx.globalAlpha = 1;
     }
-    rr(bx - 1, by - 1, w + 2, h + 2, r + 1);
-    ctx.strokeStyle = "rgba(0,0,0,0.22)";
-    ctx.lineWidth = 1;
+    rr(bx, by, w, h, r);
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
 }
