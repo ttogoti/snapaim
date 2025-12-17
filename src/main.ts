@@ -177,6 +177,12 @@ function updateSpeedFromMouse() {
 
 let lastKillerName: string | null = null;
 
+
+function unlockMouseNow() {
+	try { document.exitPointerLock(); } catch {}
+}
+
+
 function stopConnection() {
 	if (heartbeat !== null) {
 		clearInterval(heartbeat);
@@ -190,8 +196,10 @@ function showDeathScreen(killedBy: string) {
 	if (isDead) return;
 	isDead = true;
 
+	unlockMouseNow();
 	stopConnection();
 	hideRoomText();
+
 
 	if (hudBottom) hudBottom.style.display = "none";
 	if (speedHud) speedHud.style.display = "none";
@@ -203,6 +211,7 @@ function showDeathScreen(killedBy: string) {
 }
 
 function resetToMenu() {
+	unlockMouseNow();
 	stopConnection();
 
 	hideRoomText();
@@ -869,15 +878,15 @@ function loop(t: number) {
 		const my = isMe ? mouseY : (s ? s.y : p.y);
 
 		if (!isMe) {
+			drawOtherHealthbar(mx, my, p);
+			drawOtherLabel(mx, my, p);
+
 			ctx.save();
 			ctx.beginPath();
 			ctx.arc(mx, my, hitRadius, 0, Math.PI * 2);
 			ctx.fillStyle = "rgba(235,70,70,0.95)";
 			ctx.fill();
 			ctx.restore();
-
-			drawOtherHealthbar(mx, my, p);
-			drawOtherLabel(mx, my, p);
 		} else {
 			drawMyCursor(mx, my);
 		}
