@@ -307,7 +307,18 @@ function startGame() {
 	connect();
 }
 
-if (playBtn) playBtn.addEventListener("click", () => startGame());
+function lockMouseNow() {
+	if (!canvas) return;
+	try { canvas.requestPointerLock(); } catch {}
+}
+
+
+if (playBtn) playBtn.addEventListener("click", () => {
+	startGame();
+	lockMouseNow();
+	requestAnimationFrame(() => lockMouseNow());
+});
+
 
 if (nameInput) {
 	nameInput.addEventListener("keydown", (e) => {
@@ -676,6 +687,24 @@ function drawOtherLabel(x: number, y: number, p: PlayerState) {
 	ctx.restore();
 }
 
+function drawMyCursor(x: number, y: number) {
+	if (!ctx) return;
+
+	ctx.save();
+	ctx.beginPath();
+	ctx.arc(x, y, 5, 0, Math.PI * 2);
+	ctx.fillStyle = "rgba(235,70,70,0.95)";
+	ctx.fill();
+
+	ctx.beginPath();
+	ctx.arc(x, y, 8, 0, Math.PI * 2);
+	ctx.strokeStyle = "rgba(0,0,0,0.25)";
+	ctx.lineWidth = 2;
+	ctx.stroke();
+	ctx.restore();
+}
+
+
 function drawOtherHealthbar(x: number, y: number, p: PlayerState) {
 	if (!ctx) return;
 
@@ -844,6 +873,7 @@ function loop(t: number) {
 		const ang = Math.atan2(my - by, mx - bx);
 		drawTriangle(bx, by, ang, 18, "rgba(40,200,80,0.95)");
 
+		if (isMe) drawMyCursor(mx, my);
 
 
 		if (!isMe) {

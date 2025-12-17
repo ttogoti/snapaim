@@ -262,8 +262,20 @@ function startGame() {
     setRoomTextCount(null);
     connect();
 }
+function lockMouseNow() {
+    if (!canvas)
+        return;
+    try {
+        canvas.requestPointerLock();
+    }
+    catch { }
+}
 if (playBtn)
-    playBtn.addEventListener("click", () => startGame());
+    playBtn.addEventListener("click", () => {
+        startGame();
+        lockMouseNow();
+        requestAnimationFrame(() => lockMouseNow());
+    });
 if (nameInput) {
     nameInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
@@ -598,6 +610,21 @@ function drawOtherLabel(x, y, p) {
     ctx.fillText(suffix, startX + numW + sufW / 2, line2Y);
     ctx.restore();
 }
+function drawMyCursor(x, y) {
+    if (!ctx)
+        return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(235,70,70,0.95)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(0,0,0,0.25)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+}
 function drawOtherHealthbar(x, y, p) {
     if (!ctx)
         return;
@@ -736,6 +763,8 @@ function loop(t) {
         drawCircleOutline(bx, by, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
         const ang = Math.atan2(my - by, mx - bx);
         drawTriangle(bx, by, ang, 18, "rgba(40,200,80,0.95)");
+        if (isMe)
+            drawMyCursor(mx, my);
         if (!isMe) {
             drawOtherHealthbar(mx, my, p);
             drawOtherLabel(mx, my, p);
