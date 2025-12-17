@@ -859,6 +859,19 @@ function loop(t: number) {
 			? bodyY
 			: (s ? s.by : (typeof p.by === "number" && isFinite(p.by) ? p.by : p.y));
 
+		drawCircleOutline(bx, by, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
+
+		const ang = Math.atan2(my - by, mx - bx);
+		drawTriangle(bx, by, ang, 18, "rgba(40,200,80,0.95)");
+	}
+
+	for (const p of players.values()) {
+		const isMe = myId && p.id === myId;
+
+		const s = !isMe ? smooth.get(p.id) : null;
+		const mx = isMe ? mouseX : (s ? s.x : p.x);
+		const my = isMe ? mouseY : (s ? s.y : p.y);
+
 		if (!isMe) {
 			ctx.save();
 			ctx.beginPath();
@@ -866,19 +879,11 @@ function loop(t: number) {
 			ctx.fillStyle = "rgba(235,70,70,0.95)";
 			ctx.fill();
 			ctx.restore();
-		}
 
-		drawCircleOutline(bx, by, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
-
-		const ang = Math.atan2(my - by, mx - bx);
-		drawTriangle(bx, by, ang, 18, "rgba(40,200,80,0.95)");
-
-		if (isMe) drawMyCursor(mx, my);
-
-
-		if (!isMe) {
 			drawOtherHealthbar(mx, my, p);
 			drawOtherLabel(mx, my, p);
+		} else {
+			drawMyCursor(mx, my);
 		}
 	}
 
