@@ -709,14 +709,15 @@ function loop(t) {
         const by = isMe
             ? bodyY
             : (s ? s.by : (typeof p.by === "number" && isFinite(p.by) ? p.by : p.y));
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(mx, my, hitRadius, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(235,70,70,0.95)";
-        ctx.fill();
-        ctx.restore();
-        if (!isMe)
-            drawCircleOutline(bx, by, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
+        if (!isMe) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(mx, my, hitRadius, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(235,70,70,0.95)";
+            ctx.fill();
+            ctx.restore();
+        }
+        drawCircleOutline(bx, by, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
         const ang = Math.atan2(my - by, mx - bx);
         drawTriangle(bx, by, ang, 18, "rgba(40,200,80,0.95)");
         if (!isMe) {
