@@ -472,7 +472,7 @@ function connect() {
 }
 let lastMoveSend = 0;
 const MOVE_SEND_MS = 50;
-window.addEventListener("pointermove", (e) => {
+document.addEventListener("pointermove", (e) => {
     if (pointerLocked) {
         mouseX += e.movementX;
         mouseY += e.movementY;
@@ -489,7 +489,13 @@ window.addEventListener("pointermove", (e) => {
         wsSend({ t: "move", x: mouseX, y: mouseY, bx: bodyX, by: bodyY });
     }
 });
-window.addEventListener("pointerdown", (e) => {
+canvas?.addEventListener("pointerdown", (e) => {
+    if (!pointerLocked) {
+        try {
+            canvas.requestPointerLock();
+        }
+        catch { }
+    }
     if (!ws || ws.readyState !== WebSocket.OPEN)
         return;
     clampMouseToCircle();
