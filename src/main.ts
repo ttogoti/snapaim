@@ -251,6 +251,7 @@ const BODY_SPEED = 520;
 let bodyX = window.innerWidth / 2;
 let bodyY = window.innerHeight / 2;
 
+let pointerLocked = false;
 let wDown = false;
 let aDown = false;
 let sDown = false;
@@ -372,6 +373,11 @@ function setLeaderboard(rows: LeaderRow[] | null) {
 		leaderboardBody.appendChild(row);
 	}
 }
+
+document.addEventListener("pointerlockchange", () => {
+	pointerLocked = document.pointerLockElement === canvas;
+});
+
 
 function connect() {
 	ws = new WebSocket(WS_URL);
@@ -531,8 +537,13 @@ let lastMoveSend = 0;
 const MOVE_SEND_MS = 50;
 
 window.addEventListener("pointermove", (e) => {
-	mouseX = e.clientX;
-	mouseY = e.clientY;
+	if (pointerLocked) {
+		mouseX += e.movementX;
+		mouseY += e.movementY;
+	} else {
+		mouseX = e.clientX;
+		mouseY = e.clientY;
+	}
 
 	clampMouseToCircle();
 	updateSpeedFromMouse();
@@ -543,6 +554,7 @@ window.addEventListener("pointermove", (e) => {
 		wsSend({ t: "move", x: mouseX, y: mouseY, bx: bodyX, by: bodyY });
 	}
 });
+
 
 window.addEventListener("pointerdown", (e) => {
 	if (!ws || ws.readyState !== WebSocket.OPEN) return;
