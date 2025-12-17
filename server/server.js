@@ -96,6 +96,8 @@ wss.on("connection", (ws) => {
         name: id4(id),
         x: 0,
         y: 0,
+        bx: 0,
+        by: 0,
         hp: 10000,
         maxHp: 10000,
         level: 1,
@@ -142,6 +144,12 @@ wss.on("connection", (ws) => {
             const y = Number(msg?.y);
             if (!isFinite(x) || !isFinite(y))
                 return;
+            const bx = Number(msg?.bx);
+            const by = Number(msg?.by);
+            if (isFinite(bx) && isFinite(by)) {
+                me.bx = bx;
+                me.by = by;
+            }
             const tNow = now();
             const dt = Math.max(1, tNow - me.lastMoveT);
             const dx = x - me.lastMoveX;
@@ -205,6 +213,8 @@ setInterval(() => {
         name: p.name,
         x: p.x,
         y: p.y,
+        bx: p.bx,
+        by: p.by,
         hp: p.hp,
         maxHp: p.maxHp,
         level: p.level,

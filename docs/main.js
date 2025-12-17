@@ -207,14 +207,44 @@ if (continueBtn) {
 }
 if (nameInput)
     nameInput.focus();
+const CONTROL_RADIUS = 110;
+const BODY_SPEED = 520;
+let bodyX = window.innerWidth / 2;
+let bodyY = window.innerHeight / 2;
+let wDown = false;
+let aDown = false;
+let sDown = false;
+let dDown = false;
+function clamp(v, a, b) {
+    return Math.max(a, Math.min(b, v));
+}
+function clampMouseToCircle() {
+    const dx = mouseX - bodyX;
+    const dy = mouseY - bodyY;
+    const len = Math.hypot(dx, dy);
+    if (len <= CONTROL_RADIUS || len <= 0)
+        return;
+    const k = CONTROL_RADIUS / len;
+    mouseX = bodyX + dx * k;
+    mouseY = bodyY + dy * k;
+}
+function clampBodyToCanvas() {
+    if (!canvas)
+        return;
+    bodyX = clamp(bodyX, 0, canvas.width);
+    bodyY = clamp(bodyY, 0, canvas.height);
+}
 function startGame() {
     if (joined)
         return;
     joined = true;
     const clean = (nameInput?.value ?? "").trim().slice(0, 18);
     myName = clean.length ? clean : "Player";
-    mouseX = window.innerWidth / 2;
-    mouseY = window.innerHeight / 2;
+    bodyX = window.innerWidth / 2;
+    bodyY = window.innerHeight / 2;
+    mouseX = bodyX;
+    mouseY = bodyY;
+    clampMouseToCircle();
     joinTimeMs = performance.now();
     resetSpeedSampler();
     if (deathScreen)
@@ -241,6 +271,28 @@ if (nameInput) {
         }
     });
 }
+window.addEventListener("keydown", (e) => {
+    const k = e.key.toLowerCase();
+    if (k === "w")
+        wDown = true;
+    if (k === "a")
+        aDown = true;
+    if (k === "s")
+        sDown = true;
+    if (k === "d")
+        dDown = true;
+});
+window.addEventListener("keyup", (e) => {
+    const k = e.key.toLowerCase();
+    if (k === "w")
+        wDown = false;
+    if (k === "a")
+        aDown = false;
+    if (k === "s")
+        sDown = false;
+    if (k === "d")
+        dDown = false;
+});
 function pickRoomCount(msg, list) {
     const rc = typeof msg?.roomCount === "number" ? msg.roomCount :
         typeof msg?.count === "number" ? msg.count :
@@ -280,10 +332,10 @@ function connect() {
     ws = new WebSocket(WS_URL);
     ws.addEventListener("open", () => {
         heartbeat = window.setInterval(() => {
-            wsSend({ t: "move", x: mouseX, y: mouseY });
+            wsSend({ t: "move", x: mouseX, y: mouseY, bx: bodyX, by: bodyY });
         }, 50);
         wsSend({ t: "setName", name: myName });
-        wsSend({ t: "move", x: mouseX, y: mouseY });
+        wsSend({ t: "move", x: mouseX, y: mouseY, bx: bodyX, by: bodyY });
     });
     ws.addEventListener("message", (ev) => {
         const msg = JSON.parse(ev.data);
@@ -307,7 +359,7 @@ function connect() {
             const rc = pickRoomCount(msg, null);
             setRoomTextCount(rc);
             wsSend({ t: "setName", name: myName });
-            wsSend({ t: "move", x: mouseX, y: mouseY });
+            wsSend({ t: "move", x: mouseX, y: mouseY, bx: bodyX, by: bodyY });
             return;
         }
         if (t === "state") {
@@ -321,12 +373,16 @@ function connect() {
             for (const p of list) {
                 players.set(p.id, p);
                 if (p.id !== myId) {
+                    const bx = typeof p.bx === "number" && isFinite(p.bx) ? p.bx : p.x;
+                    const by = typeof p.by === "number" && isFinite(p.by) ? p.by : p.y;
                     const s = smooth.get(p.id);
                     if (!s)
-                        smooth.set(p.id, { x: p.x, y: p.y, tx: p.x, ty: p.y });
+                        smooth.set(p.id, { x: p.x, y: p.y, tx: p.x, ty: p.y, bx, by, tbx: bx, tby: by });
                     else {
                         s.tx = p.x;
                         s.ty = p.y;
+                        s.tbx = bx;
+                        s.tby = by;
                     }
                 }
             }
@@ -415,17 +471,19 @@ const MOVE_SEND_MS = 50;
 window.addEventListener("pointermove", (e) => {
     mouseX = e.clientX;
     mouseY = e.clientY;
+    clampMouseToCircle();
     updateSpeedFromMouse();
     const now = performance.now();
     if (ws && ws.readyState === WebSocket.OPEN && now - lastMoveSend >= MOVE_SEND_MS) {
         lastMoveSend = now;
-        wsSend({ t: "move", x: mouseX, y: mouseY });
+        wsSend({ t: "move", x: mouseX, y: mouseY, bx: bodyX, by: bodyY });
     }
 });
 window.addEventListener("pointerdown", (e) => {
     if (!ws || ws.readyState !== WebSocket.OPEN)
         return;
-    wsSend({ t: "click", x: e.clientX, y: e.clientY });
+    clampMouseToCircle();
+    wsSend({ t: "click", x: mouseX, y: mouseY });
 });
 function maxHpForPlayer(p) {
     if (typeof p.maxHp === "number" && p.maxHp > 0)
@@ -566,7 +624,41 @@ function drawOtherHealthbar(x, y, p) {
     ctx.stroke();
     ctx.restore();
 }
-function loop() {
+function drawCircleOutline(x, y, r, color, lw) {
+    if (!ctx)
+        return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw;
+    ctx.stroke();
+    ctx.restore();
+}
+function drawTriangle(x, y, ang, size, color) {
+    if (!ctx)
+        return;
+    const c = Math.cos(ang);
+    const s = Math.sin(ang);
+    const p1x = x + c * size;
+    const p1y = y + s * size;
+    const bx = x - c * (size * 0.65);
+    const by = y - s * (size * 0.65);
+    const lx = bx + (-s) * (size * 0.62);
+    const ly = by + (c) * (size * 0.62);
+    const rx = bx + (s) * (size * 0.62);
+    const ry = by + (-c) * (size * 0.62);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(p1x, p1y);
+    ctx.lineTo(lx, ly);
+    ctx.lineTo(rx, ry);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
+}
+function loop(t) {
     if (!canvas || !ctx)
         return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -574,24 +666,65 @@ function loop() {
     for (const s of smooth.values()) {
         s.x += (s.tx - s.x) * SMOOTH;
         s.y += (s.ty - s.y) * SMOOTH;
+        s.bx += (s.tbx - s.bx) * SMOOTH;
+        s.by += (s.tby - s.by) * SMOOTH;
+    }
+    const dt = typeof loop._lt === "number" ? Math.min(0.05, (t - loop._lt) / 1000) : 0;
+    loop._lt = t;
+    const prevBX = bodyX;
+    const prevBY = bodyY;
+    if (joined && !isDead) {
+        let vx = 0;
+        let vy = 0;
+        if (wDown)
+            vy -= 1;
+        if (sDown)
+            vy += 1;
+        if (aDown)
+            vx -= 1;
+        if (dDown)
+            vx += 1;
+        const len = Math.hypot(vx, vy);
+        if (len > 0) {
+            vx /= len;
+            vy /= len;
+        }
+        bodyX += vx * BODY_SPEED * dt;
+        bodyY += vy * BODY_SPEED * dt;
+        clampBodyToCanvas();
+        const dx = bodyX - prevBX;
+        const dy = bodyY - prevBY;
+        mouseX += dx;
+        mouseY += dy;
+        clampMouseToCircle();
     }
     for (const p of players.values()) {
-        if (myId && p.id === myId)
-            continue;
-        const s = smooth.get(p.id);
-        const x = s ? s.x : p.x;
-        const y = s ? s.y : p.y;
+        const isMe = myId && p.id === myId;
+        const s = !isMe ? smooth.get(p.id) : null;
+        const mx = isMe ? mouseX : (s ? s.x : p.x);
+        const my = isMe ? mouseY : (s ? s.y : p.y);
+        const bx = isMe
+            ? bodyX
+            : (s ? s.bx : (typeof p.bx === "number" && isFinite(p.bx) ? p.bx : p.x));
+        const by = isMe
+            ? bodyY
+            : (s ? s.by : (typeof p.by === "number" && isFinite(p.by) ? p.by : p.y));
         ctx.save();
         ctx.beginPath();
-        ctx.arc(x, y, hitRadius, 0, Math.PI * 2);
+        ctx.arc(mx, my, hitRadius, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(235,70,70,0.95)";
         ctx.fill();
         ctx.restore();
-        drawOtherHealthbar(x, y, p);
-        drawOtherLabel(x, y, p);
+        drawCircleOutline(bx, by, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
+        const ang = Math.atan2(my - by, mx - bx);
+        drawTriangle(bx, by, ang, 18, "rgba(40,200,80,0.95)");
+        if (!isMe) {
+            drawOtherHealthbar(mx, my, p);
+            drawOtherLabel(mx, my, p);
+        }
     }
     updateHudBars();
     requestAnimationFrame(loop);
 }
 hideRoomText();
-loop();
+requestAnimationFrame(loop);
