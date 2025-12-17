@@ -230,13 +230,24 @@ function resetToMenu() {
 function respawnNow() {
     if (deathScreen)
         deathScreen.style.display = "none";
+    stopConnection();
     isDead = false;
-    joined = false;
+    joined = true;
     myId = null;
     myMaxHp = null;
     lastKillerName = null;
     players.clear();
     smooth.clear();
+    wDown = false;
+    aDown = false;
+    sDown = false;
+    dDown = false;
+    bodyX = window.innerWidth / 2;
+    bodyY = window.innerHeight / 2;
+    mouseX = bodyX;
+    mouseY = bodyY;
+    clampMouseToCircle();
+    joinTimeMs = performance.now();
     resetSpeedSampler();
     if (hudBottom)
         hudBottom.style.display = "flex";
@@ -248,7 +259,6 @@ function respawnNow() {
         menu.style.display = "none";
     showRoomText();
     setRoomTextCount(null);
-    joinTimeMs = performance.now();
     lockMouseNow();
     requestAnimationFrame(() => lockMouseNow());
     connect();
@@ -760,7 +770,7 @@ function flashHit(id) {
 }
 function spawnDamage(id, v) {
     const arr = popups.get(id) ?? [];
-    arr.push({ id: `${performance.now()}_${Math.random()}`, v, t0: performance.now(), dur: 650 });
+    arr.push({ id: `${performance.now()}_${Math.random()}`, v, t0: performance.now(), dur: 650, side: Math.random() < 0.5 ? -1 : 1 });
     popups.set(id, arr);
 }
 function drawPopups(id, x, y) {
@@ -779,7 +789,7 @@ function drawPopups(id, x, y) {
         keep.push(p);
         const up = 18 + t * 26;
         const alpha = Math.max(0, Math.min(1, 1 - t));
-        const sx = x + (i % 2 === 0 ? -10 : 10);
+        const sx = x + p.side * 10;
         const sy = y - hitRadius - up;
         ctx.save();
         ctx.globalAlpha = alpha;
