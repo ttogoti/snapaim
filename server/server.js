@@ -15,6 +15,7 @@ const SPEED_PENALTY_DMG = 4999;
 const SPEED_PENALTY_COOLDOWN_MS = 2000;
 const MAXHP_STEP = 5000;
 const STALE_MS = 6000;
+const LEVEL_DMG_START = 30000;
 function now() {
     return Date.now();
 }
@@ -47,27 +48,27 @@ function leaderboardTop10() {
     arr.sort((a, b) => b.damage - a.damage);
     return arr.slice(0, 10);
 }
-function applyLevelProgress(attacker) {
-    attacker.killsInLevel += 1;
-    if (attacker.killsInLevel >= attacker.killsNeeded) {
+function applyDamageProgress(attacker, dealt) {
+    attacker.killsInLevel += dealt;
+    while (attacker.killsInLevel >= attacker.killsNeeded) {
         const pct = attacker.maxHp > 0 ? attacker.hp / attacker.maxHp : 1;
+        attacker.killsInLevel -= attacker.killsNeeded;
         attacker.level += 1;
-        attacker.killsInLevel = 0;
-        attacker.killsNeeded = Math.max(1, Math.floor(attacker.killsNeeded * 1.5));
+        attacker.killsNeeded = Math.max(1, Math.ceil(attacker.killsNeeded * 1.5));
         attacker.maxHp += MAXHP_STEP;
         attacker.hp = Math.max(1, Math.round(pct * attacker.maxHp));
     }
 }
-function applyDamage(attacker, target, dmg, fromId) {
+function applyDamage(attacker, target, dmg, combo, fromId) {
     const before = target.hp;
     const applied = Math.max(0, Math.min(before, Math.floor(dmg)));
     if (applied <= 0)
         return;
     target.hp = Math.max(0, before - applied);
     attacker.damage += applied;
-    broadcast({ t: "hit", from: fromId ?? attacker.id, to: target.id, hp: target.hp, maxHp: target.maxHp });
+    applyDamageProgress(attacker, applied);
+    broadcast({ t: "hit", from: fromId ?? attacker.id, to: target.id, hp: target.hp, maxHp: target.maxHp, dmg: applied, combo });
     if (target.hp <= 0) {
-        applyLevelProgress(attacker);
         broadcast({ t: "hit", from: attacker.id, to: attacker.id, hp: attacker.hp, maxHp: attacker.maxHp });
         const byName = attacker.name || id4(attacker.id);
         const toWs = Array.from(sockets.entries()).find(([, pid]) => pid === target.id)?.[0];
@@ -88,6 +89,11 @@ function removeByWs(ws) {
     sockets.delete(ws);
     players.delete(pid);
 }
+function rngInt(a, b) {
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    return lo + Math.floor(Math.random() * (hi - lo + 1));
+}
 wss.on("connection", (ws) => {
     const id = crypto.randomBytes(8).toString("hex");
     const t = now();
@@ -96,20 +102,20 @@ wss.on("connection", (ws) => {
         name: id4(id),
         x: 0,
         y: 0,
-        bx: 0,
-        by: 0,
         hp: 10000,
         maxHp: 10000,
         level: 1,
         killsInLevel: 0,
-        killsNeeded: 3,
+        killsNeeded: LEVEL_DMG_START,
         damage: 0,
         lastMoveT: t,
         lastMoveX: 0,
         lastMoveY: 0,
         speed: 0,
         lastSpeedPenaltyT: 0,
-        lastSeen: t
+        lastSeen: t,
+        comboBase: 0,
+        comboMult: 1
     };
     players.set(id, p);
     sockets.set(ws, id);
@@ -120,7 +126,10 @@ wss.on("connection", (ws) => {
         speedMax: SPEED_MAX,
         roomCount: players.size,
         hp: p.hp,
-        maxHp: p.maxHp
+        maxHp: p.maxHp,
+        level: p.level,
+        killsInLevel: p.killsInLevel,
+        killsNeeded: p.killsNeeded
     });
     ws.on("message", (buf) => {
         let msg;
@@ -144,12 +153,6 @@ wss.on("connection", (ws) => {
             const y = Number(msg?.y);
             if (!isFinite(x) || !isFinite(y))
                 return;
-            const bx = Number(msg?.bx);
-            const by = Number(msg?.by);
-            if (isFinite(bx) && isFinite(by)) {
-                me.bx = bx;
-                me.by = by;
-            }
             const tNow = now();
             const dt = Math.max(1, tNow - me.lastMoveT);
             const dx = x - me.lastMoveX;
@@ -193,10 +196,16 @@ wss.on("connection", (ws) => {
                     best = other;
                 }
             }
-            if (!best)
+            if (!best) {
+                me.comboBase = 0;
+                me.comboMult = 1;
                 return;
-            const dmg = Math.max(1, Math.floor(Math.min(me.speed, 3500)));
-            applyDamage(me, best, dmg);
+            }
+            if (me.comboBase <= 0)
+                me.comboBase = rngInt(250, 300);
+            me.comboMult = Math.max(2, me.comboMult * 2);
+            const dmg = me.comboBase * me.comboMult;
+            applyDamage(me, best, dmg, me.comboMult);
             return;
         }
     });
@@ -213,8 +222,6 @@ setInterval(() => {
         name: p.name,
         x: p.x,
         y: p.y,
-        bx: p.bx,
-        by: p.by,
         hp: p.hp,
         maxHp: p.maxHp,
         level: p.level,

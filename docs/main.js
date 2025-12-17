@@ -163,12 +163,19 @@ function lockMouseNow() {
     }
     catch { }
 }
+function unlockMouseNow() {
+    try {
+        document.exitPointerLock();
+    }
+    catch { }
+}
 function showDeathScreen(killedBy) {
     if (isDead)
         return;
     isDead = true;
     stopConnection();
     hideRoomText();
+    unlockMouseNow();
     if (hudBottom)
         hudBottom.style.display = "none";
     if (speedHud)
@@ -183,15 +190,15 @@ function showDeathScreen(killedBy) {
     const mx = SPEED_MAX > 0 ? Math.max(0, Math.min(100, Math.round((peakSpeed / SPEED_MAX) * 100))) : 0;
     if (deathBig)
         deathBig.textContent = killedBy;
-    if (deathStats) {
+    if (deathStats)
         deathStats.textContent = `Damage dealt: ${Math.round(dmg).toLocaleString()}   Peak speed: ${pk.toLocaleString()} (${mx}%)`;
-    }
     if (deathScreen)
         deathScreen.style.display = "flex";
 }
 function resetToMenu() {
     stopConnection();
     hideRoomText();
+    unlockMouseNow();
     isDead = false;
     joined = false;
     myId = null;
@@ -226,6 +233,33 @@ function resetToMenu() {
         nameInput.value = "";
         nameInput.focus();
     }
+}
+const CONTROL_RADIUS = 110;
+const BODY_SPEED = 360;
+let bodyX = window.innerWidth / 2;
+let bodyY = window.innerHeight / 2;
+let wDown = false;
+let aDown = false;
+let sDown = false;
+let dDown = false;
+function clamp(v, a, b) {
+    return Math.max(a, Math.min(b, v));
+}
+function clampMouseToCircle() {
+    const dx = mouseX - bodyX;
+    const dy = mouseY - bodyY;
+    const len = Math.hypot(dx, dy);
+    if (len <= CONTROL_RADIUS || len <= 0)
+        return;
+    const k = CONTROL_RADIUS / len;
+    mouseX = bodyX + dx * k;
+    mouseY = bodyY + dy * k;
+}
+function clampBodyToCanvas() {
+    if (!canvas)
+        return;
+    bodyX = clamp(bodyX, 0, canvas.width);
+    bodyY = clamp(bodyY, 0, canvas.height);
 }
 function respawnNow() {
     if (deathScreen)
@@ -275,33 +309,6 @@ if (menuBtn) {
 }
 if (nameInput)
     nameInput.focus();
-const CONTROL_RADIUS = 110;
-const BODY_SPEED = 360;
-let bodyX = window.innerWidth / 2;
-let bodyY = window.innerHeight / 2;
-let wDown = false;
-let aDown = false;
-let sDown = false;
-let dDown = false;
-function clamp(v, a, b) {
-    return Math.max(a, Math.min(b, v));
-}
-function clampMouseToCircle() {
-    const dx = mouseX - bodyX;
-    const dy = mouseY - bodyY;
-    const len = Math.hypot(dx, dy);
-    if (len <= CONTROL_RADIUS || len <= 0)
-        return;
-    const k = CONTROL_RADIUS / len;
-    mouseX = bodyX + dx * k;
-    mouseY = bodyY + dy * k;
-}
-function clampBodyToCanvas() {
-    if (!canvas)
-        return;
-    bodyX = clamp(bodyX, 0, canvas.width);
-    bodyY = clamp(bodyY, 0, canvas.height);
-}
 function startGame() {
     if (joined)
         return;
@@ -489,21 +496,20 @@ function connect() {
             const to = msg.to ?? msg.target ?? msg.id;
             const hp = msg.hp ?? msg.newHp ?? msg.health;
             const maxHp = msg.maxHp ?? msg.maxHealth;
+            const dmg = msg.dmg;
+            const combo = msg.combo;
             if (typeof to === "string") {
                 const target = players.get(to);
                 if (target) {
-                    const oldHp = typeof target.hp === "number" ? target.hp : 0;
                     if (typeof hp === "number")
                         target.hp = hp;
                     if (typeof maxHp === "number" && maxHp > 0)
                         target.maxHp = maxHp;
-                    if (typeof hp === "number") {
-                        const d = Math.max(0, Math.round(oldHp - hp));
-                        if (d > 0)
-                            spawnDamage(to, d);
-                    }
-                    if (typeof hp === "number" && hp < oldHp)
-                        flashHit(to);
+                    if (typeof dmg === "number" && isFinite(dmg) && dmg > 0)
+                        spawnDamage(to, Math.round(dmg));
+                    if (typeof combo === "number" && isFinite(combo) && combo >= 2)
+                        spawnCombo(to, Math.round(combo));
+                    flashHit(to);
                 }
             }
             if (myId && to === myId) {
@@ -537,9 +543,8 @@ function connect() {
             clearInterval(heartbeat);
             heartbeat = null;
         }
-        if (joined && (!deathScreen || deathScreen.style.display !== "flex")) {
+        if (joined && (!deathScreen || deathScreen.style.display !== "flex"))
             resetToMenu();
-        }
     });
     ws.addEventListener("error", () => {
         if (joined && (!deathScreen || deathScreen.style.display !== "flex"))
@@ -590,6 +595,13 @@ function speedHueYellowToRed(pct) {
     const t = Math.max(0, Math.min(1, pct));
     return 60 - 60 * t;
 }
+let hudHp = 0;
+let hudMax = 1;
+let hudHpShown = 0;
+let hudMaxShown = 1;
+let hudProg = 0;
+let hudProgShown = 0;
+let hudLevelShown = 1;
 function updateHudBars() {
     if (!joined || isDead || !myId) {
         if (hpFill)
@@ -608,26 +620,37 @@ function updateHudBars() {
     if (!me)
         return;
     const maxHp = maxHpForPlayer(me);
-    const hpPct = Math.max(0, Math.min(1, me.hp / maxHp));
-    const spPct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
+    const hpVal = typeof me.hp === "number" && isFinite(me.hp) ? me.hp : 0;
+    const inLvl = typeof me.killsInLevel === "number" && isFinite(me.killsInLevel) ? me.killsInLevel : 0;
+    const need = typeof me.killsNeeded === "number" && isFinite(me.killsNeeded) && me.killsNeeded > 0 ? me.killsNeeded : 30000;
+    const lp = Math.max(0, Math.min(1, inLvl / need));
+    hudHp = hpVal;
+    hudMax = maxHp;
+    hudProg = lp;
+    const level = typeof me.level === "number" && isFinite(me.level) ? me.level : 1;
+    hudLevelShown += (level - hudLevelShown) * 0.2;
+    hudHpShown += (hudHp - hudHpShown) * 0.12;
+    hudMaxShown += (hudMax - hudMaxShown) * 0.12;
+    hudProgShown += (hudProg - hudProgShown) * 0.12;
+    const hpPct = hudMaxShown > 0 ? Math.max(0, Math.min(1, hudHpShown / hudMaxShown)) : 0;
     const hh = hpHueGreenToRed(hpPct);
     if (hpFill) {
         hpFill.style.width = `${hpPct * 100}%`;
         hpFill.style.background = `hsl(${hh}, 85%, 55%)`;
     }
     if (hpText) {
-        hpText.textContent = `HP: ${Math.round(me.hp).toLocaleString()}/${Math.round(maxHp).toLocaleString()}`;
+        const a = Math.max(0, Math.round(hudHpShown));
+        const b = Math.max(1, Math.round(hudMaxShown));
+        hpText.textContent = `HP: ${a.toLocaleString()}/${b.toLocaleString()}`;
     }
-    const level = typeof me.level === "number" && isFinite(me.level) ? me.level : 1;
-    const inLvl = typeof me.killsInLevel === "number" && isFinite(me.killsInLevel) ? me.killsInLevel : 0;
-    const need = typeof me.killsNeeded === "number" && isFinite(me.killsNeeded) && me.killsNeeded > 0 ? me.killsNeeded : 3;
-    const lp = Math.max(0, Math.min(1, inLvl / need));
+    const lpPct = Math.max(0, Math.min(1, hudProgShown));
     if (levelFill) {
-        levelFill.style.width = lp <= 0 ? "14px" : `${lp * 100}%`;
+        levelFill.style.width = lpPct <= 0 ? "14px" : `${lpPct * 100}%`;
         levelFill.style.background = "linear-gradient(to bottom, #7fb6ff 0%, #7fb6ff 66.666%, #2f76ff 66.666%, #2f76ff 100%)";
     }
     if (levelText)
-        levelText.textContent = `Level: ${level}`;
+        levelText.textContent = `Level: ${Math.round(hudLevelShown)}`;
+    const spPct = Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX));
     const sh = speedHueYellowToRed(spPct);
     if (speedFill) {
         speedFill.style.height = `${spPct * 100}%`;
@@ -770,7 +793,12 @@ function flashHit(id) {
 }
 function spawnDamage(id, v) {
     const arr = popups.get(id) ?? [];
-    arr.push({ id: `${performance.now()}_${Math.random()}`, v, t0: performance.now(), dur: 650, side: Math.random() < 0.5 ? -1 : 1 });
+    arr.push({ id: `${performance.now()}_${Math.random()}`, text: `${v.toLocaleString()}`, t0: performance.now(), dur: 650, side: Math.random() < 0.5 ? -1 : 1, kind: "dmg" });
+    popups.set(id, arr);
+}
+function spawnCombo(id, combo) {
+    const arr = popups.get(id) ?? [];
+    arr.push({ id: `${performance.now()}_${Math.random()}`, text: `x${combo}`, t0: performance.now(), dur: 750, side: 0, kind: "combo" });
     popups.set(id, arr);
 }
 function drawPopups(id, x, y) {
@@ -787,20 +815,36 @@ function drawPopups(id, x, y) {
         if (t >= 1)
             continue;
         keep.push(p);
-        const up = 18 + t * 26;
+        const up = (p.kind === "combo" ? 34 : 18) + t * 26;
         const alpha = Math.max(0, Math.min(1, 1 - t));
-        const sx = x + p.side * 10;
+        const sx = x + (p.side === 0 ? 0 : p.side * 10);
         const sy = y - hitRadius - up;
         ctx.save();
         ctx.globalAlpha = alpha;
         ctx.textAlign = "center";
         ctx.textBaseline = "alphabetic";
-        ctx.font = "900 12px Ubuntu, system-ui";
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = "rgba(55,55,55,0.95)";
-        ctx.strokeText(`${p.v.toLocaleString()}`, sx, sy);
-        ctx.fillStyle = "rgba(255,255,255,0.95)";
-        ctx.fillText(`${p.v.toLocaleString()}`, sx, sy);
+        if (p.kind === "combo") {
+            const g = ctx.createLinearGradient(sx - 30, sy - 12, sx + 30, sy + 2);
+            g.addColorStop(0, "rgba(255,240,150,1)");
+            g.addColorStop(0.45, "rgba(255,255,255,1)");
+            g.addColorStop(1, "rgba(255,200,60,1)");
+            ctx.shadowColor = "rgba(255,210,80,0.95)";
+            ctx.shadowBlur = 10;
+            ctx.font = "900 14px Ubuntu, system-ui";
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "rgba(80,55,10,0.95)";
+            ctx.strokeText(p.text, sx, sy);
+            ctx.fillStyle = g;
+            ctx.fillText(p.text, sx, sy);
+        }
+        else {
+            ctx.font = "900 12px Ubuntu, system-ui";
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = "rgba(55,55,55,0.95)";
+            ctx.strokeText(p.text, sx, sy);
+            ctx.fillStyle = "rgba(255,255,255,0.95)";
+            ctx.fillText(p.text, sx, sy);
+        }
         ctx.restore();
     }
     if (keep.length)
@@ -908,10 +952,7 @@ function loop(t) {
             pushTrail(mouseX, mouseY);
         drawTrail();
     }
-    for (const p of players.values()) {
-        const isMe = myId && p.id === myId;
-        if (!isMe)
-            continue;
+    if (joined && !isDead) {
         drawCircleOutline(bodyX, bodyY, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
         const ang = Math.atan2(mouseY - bodyY, mouseX - bodyX);
         drawTriangle(bodyX, bodyY, ang, 18, "rgba(40,200,80,0.95)");
