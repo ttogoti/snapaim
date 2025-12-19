@@ -74,6 +74,56 @@ let mouseY = window.innerHeight / 2;
 let myMaxHp = null;
 const players = new Map();
 const smooth = new Map();
+const particles = [];
+function spawnHitParticles(x, y) {
+    const n = 18;
+    for (let i = 0; i < n; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = 240 + Math.random() * 420;
+        const vx = Math.cos(a) * sp;
+        const vy = Math.sin(a) * sp;
+        const life = 380 + Math.random() * 260;
+        const r = 1.8 + Math.random() * 2.2;
+        particles.push({ x, y, vx, vy, age: 0, life, r });
+    }
+}
+function stepParticles(dt) {
+    if (particles.length === 0)
+        return;
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.age += dt * 1000;
+        if (p.age >= p.life) {
+            particles.splice(i, 1);
+            continue;
+        }
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        const drag = Math.exp(-7.5 * dt);
+        p.vx *= drag;
+        p.vy *= drag;
+        p.vy += 520 * dt;
+    }
+}
+function drawParticles() {
+    if (!ctx)
+        return;
+    if (particles.length === 0)
+        return;
+    ctx.save();
+    for (const p of particles) {
+        const t = 1 - p.age / p.life;
+        const a = Math.max(0, Math.min(1, t));
+        if (a <= 0)
+            continue;
+        ctx.globalAlpha = a;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(235,70,70,1)";
+        ctx.fill();
+    }
+    ctx.restore();
+}
 const WS_URL = location.hostname === "localhost"
     ? "ws://localhost:8080"
     : "wss://snapaim.onrender.com";
@@ -509,6 +559,10 @@ function connect() {
                         spawnDamage(to, Math.round(dmg));
                     if (typeof combo === "number" && isFinite(combo) && combo >= 2)
                         spawnCombo(to, Math.round(combo));
+                    const s = smooth.get(to);
+                    const px = s ? s.x : target.x;
+                    const py = s ? s.y : target.y;
+                    spawnHitParticles(px, py);
                     flashHit(to);
                 }
             }
@@ -897,12 +951,14 @@ function drawDangerVignette(spPct, t) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
 }
+let lastFrameT = performance.now();
 function loop(t) {
     if (!canvas || !ctx)
         return;
     const spPct = SPEED_MAX > 0 ? Math.max(0, Math.min(1, smoothSpeed / SPEED_MAX)) : 0;
     const dt = typeof loop._lt === "number" ? Math.min(0.05, (t - loop._lt) / 1000) : 0;
     loop._lt = t;
+    stepParticles(dt);
     const SMOOTH = 0.18;
     for (const s of smooth.values()) {
         s.x += (s.tx - s.x) * SMOOTH;
@@ -989,6 +1045,7 @@ function loop(t) {
     }
     ctx.restore();
     drawDangerVignette(spPct, t);
+    drawParticles();
     updateHudBars();
     requestAnimationFrame(loop);
 }
