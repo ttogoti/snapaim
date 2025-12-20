@@ -45,7 +45,14 @@ const MAXHP_STEP = 5000;
 
 const STALE_MS = 6000;
 
-const LEVEL_DMG_START = 30000;
+const LEVEL_DMG_START = 10000;
+const TILE_SIZE = 40;
+const BASE_RANGE = 110;
+
+function rangeForLevel(level: number) {
+	const lv = Math.max(1, Math.floor(level));
+	return BASE_RANGE + (lv - 1) * TILE_SIZE;
+}
 
 function now() {
 	return Date.now();
@@ -91,7 +98,7 @@ function applyDamageProgress(attacker: Player, dealt: number) {
 
 		attacker.killsInLevel -= attacker.killsNeeded;
 		attacker.level += 1;
-		attacker.killsNeeded = Math.max(1, Math.ceil(attacker.killsNeeded * 1.5));
+		attacker.killsNeeded = Math.max(1, Math.round(attacker.killsNeeded * 1.5));
 
 		attacker.maxHp += MAXHP_STEP;
 		attacker.hp = Math.max(1, Math.round(pct * attacker.maxHp));
@@ -113,9 +120,13 @@ function applyDamage(attacker: Player, target: Player, dmg: number, combo: numbe
 	if (target.hp <= 0) {
 		broadcast({ t: "hit", from: attacker.id, to: attacker.id, hp: attacker.hp, maxHp: attacker.maxHp });
 
-		const byName = attacker.name || id4(attacker.id);
+		const killerName = attacker.name || id4(attacker.id);
+		const victimName = target.name || id4(target.id);
+
+		broadcast({ t: "kill", killerName, victimName });
+
 		const toWs = Array.from(sockets.entries()).find(([, pid]) => pid === target.id)?.[0];
-		if (toWs) send(toWs, { t: "dead", byName });
+		if (toWs) send(toWs, { t: "dead", byName: killerName });
 	}
 }
 
@@ -198,6 +209,13 @@ wss.on("connection", (ws) => {
 			const x = Number(msg?.x);
 			const y = Number(msg?.y);
 			if (!isFinite(x) || !isFinite(y)) return;
+			const r = rangeForLevel(me.level);
+			const dFromMe = Math.hypot(x - me.x, y - me.y);
+			if (dFromMe > r) {
+				me.comboBase = 0;
+				me.comboMult = 1;
+				return;
+			}
 
 			const tNow = now();
 			const dt = Math.max(1, tNow - me.lastMoveT);

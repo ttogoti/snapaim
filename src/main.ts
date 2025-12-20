@@ -249,6 +249,8 @@ function updateSpeedFromMouse() {
 }
 
 let lastKillerName: string | null = null;
+let hitFreezeUntil = 0;
+let hitShakeUntil = 0;
 
 function stopConnection() {
 	if (heartbeat !== null) {
@@ -337,8 +339,16 @@ function resetToMenu() {
 	}
 }
 
-const CONTROL_RADIUS = 110;
+const TILE_SIZE = 40;
+const BASE_CONTROL_RADIUS = 110;
+function myControlRadius() {
+	const me = myId ? players.get(myId) : null;
+	const lvl = me && typeof me.level === "number" && isFinite(me.level) ? Math.max(1, Math.floor(me.level)) : 1;
+	return BASE_CONTROL_RADIUS + (lvl - 1) * TILE_SIZE;
+}
+
 const BODY_SPEED = 360;
+
 
 let bodyX = window.innerWidth / 2;
 let bodyY = window.innerHeight / 2;
@@ -356,8 +366,9 @@ function clampMouseToCircle() {
 	const dx = mouseX - bodyX;
 	const dy = mouseY - bodyY;
 	const len = Math.hypot(dx, dy);
-	if (len <= CONTROL_RADIUS || len <= 0) return;
-	const k = CONTROL_RADIUS / len;
+	const r = myControlRadius();
+	if (len <= r || len <= 0) return;
+	const k = r / len;
 	mouseX = bodyX + dx * k;
 	mouseY = bodyY + dy * k;
 }
@@ -542,6 +553,12 @@ function connect() {
 	ws.addEventListener("message", (ev) => {
 		const msg = JSON.parse(ev.data);
 		const t = msgType(msg);
+		if (t === "kill") {
+			const killer = typeof msg.killerName === "string" ? msg.killerName : "Someone";
+			const victim = typeof msg.victimName === "string" ? msg.victimName : "Someone";
+			pushKillFeed(`${killer} eliminated ${victim}`);
+			return;
+		}
 
 		if (t === "dead") {
 			const byName = typeof msg.byName === "string" ? msg.byName : null;
@@ -646,6 +663,16 @@ function connect() {
 					spawnHitParticles(px, py);
 
 					flashHit(to);
+
+					if (myId && msg.from === myId) {
+						hitShakeUntil = performance.now() + 120;
+						hitFreezeUntil = performance.now() + 35;
+					}
+					if (myId && to === myId) {
+						hitShakeUntil = performance.now() + 140;
+						hitFreezeUntil = performance.now() + 45;
+					}
+
 				}
 			}
 
@@ -972,6 +999,8 @@ function drawMyCursor(x: number, y: number) {
 type Popup = { id: string; text: string; t0: number; dur: number; side: number; kind: "dmg" | "combo" };
 const popups = new Map<string, Popup[]>();
 const hitFlashUntil = new Map<string, number>();
+type KillFeedLine = { text: string; t0: number };
+const killFeed: KillFeedLine[] = [];
 
 function flashHit(id: string) {
 	hitFlashUntil.set(id, performance.now() + 120);
@@ -1075,6 +1104,44 @@ function drawTrail() {
 	}
 }
 
+function pushKillFeed(text: string) {
+	killFeed.push({ text, t0: performance.now() });
+	while (killFeed.length > 6) killFeed.shift();
+}
+
+function drawKillFeed() {
+	if (!ctx) return;
+
+	const now = performance.now();
+	let y = 44;
+
+	for (let i = killFeed.length - 1; i >= 0; i--) {
+		const k = killFeed[i];
+		const age = now - k.t0;
+		if (age > 3200) {
+			killFeed.splice(i, 1);
+			continue;
+		}
+
+		const a = Math.max(0, Math.min(1, 1 - age / 3200));
+
+		ctx.save();
+		ctx.globalAlpha = a;
+		ctx.textAlign = "left";
+		ctx.textBaseline = "alphabetic";
+		ctx.font = "800 14px Ubuntu, system-ui";
+		ctx.lineWidth = 4;
+		ctx.strokeStyle = "rgba(255,255,255,0.9)";
+		ctx.strokeText(k.text, 18, y);
+		ctx.fillStyle = "rgba(0,0,0,0.85)";
+		ctx.fillText(k.text, 18, y);
+		ctx.restore();
+
+		y += 18;
+	}
+}
+
+
 function drawDangerVignette(spPct: number, t: number) {
 	if (!ctx || !canvas) return;
 	const k = Math.max(0, Math.min(1, (spPct - 0.82) / 0.18));
@@ -1103,6 +1170,11 @@ function loop(t: number) {
 
 	const dt = typeof (loop as any)._lt === "number" ? Math.min(0.05, (t - (loop as any)._lt) / 1000) : 0;
 	(loop as any)._lt = t;
+	if (performance.now() < hitFreezeUntil) {
+		requestAnimationFrame(loop);
+		return;
+	}
+
 
 	stepParticles(dt);
 
@@ -1148,9 +1220,14 @@ function loop(t: number) {
 
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-	const shakeK = joined && !isDead ? Math.max(0, Math.min(1, (spPct - 0.88) / 0.12)) : 0;
-	const shakePulse = 0.5 + 0.5 * Math.sin(t * 0.09);
-	const shake = shakeK * (1.2 + 1.8 * shakePulse);
+	const speedShakeK = joined && !isDead ? Math.max(0, Math.min(1, (spPct - 0.88) / 0.12)) : 0;
+	const speedShakePulse = 0.5 + 0.5 * Math.sin(t * 0.09);
+	const speedShake = speedShakeK * (1.2 + 1.8 * speedShakePulse);
+
+	const hitShakeK = performance.now() < hitShakeUntil ? 1 : 0;
+	const hitShake = hitShakeK * (2.8 + 1.4 * (0.5 + 0.5 * Math.sin(t * 0.22)));
+
+	const shake = speedShake + hitShake;
 
 	ctx.save();
 	if (shake > 0) {
@@ -1165,7 +1242,7 @@ function loop(t: number) {
 	}
 
 	if (joined && !isDead) {
-		drawCircleOutline(bodyX, bodyY, CONTROL_RADIUS, "rgba(40,200,80,0.95)", 3);
+		drawCircleOutline(bodyX, bodyY, myControlRadius(), "rgba(40,200,80,0.95)", 3);
 		const ang = Math.atan2(mouseY - bodyY, mouseX - bodyX);
 		drawTriangle(bodyX, bodyY, ang, 18, "rgba(40,200,80,0.95)");
 	}
@@ -1207,6 +1284,7 @@ function loop(t: number) {
 	ctx.restore();
 
 	drawDangerVignette(spPct, t);
+	drawKillFeed();
 	drawParticles();
 
 	updateHudBars();
