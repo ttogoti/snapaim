@@ -12,6 +12,7 @@ type Player = {
 	hp: number;
 	maxHp: number;
 	level: number;
+	kills: number;
 	killsInLevel: number;
 	killsNeeded: number;
 	damage: number;
@@ -47,7 +48,7 @@ const MAXHP_STEP = 5000;
 
 const STALE_MS = 6000;
 
-const LEVEL_DMG_START = 30000;
+const LEVEL_DMG_START = 10000;
 
 function now() {
 	return Date.now();
@@ -120,13 +121,14 @@ function applyDamage(attacker: Player, target: Player, dmg: number, combo: numbe
 		combo
 	});
 
-	if (target.hp <= 0) {
-		broadcast({ t: "hit", from: attacker.id, to: attacker.id, hp: attacker.hp, maxHp: attacker.maxHp });
+if (target.hp <= 0) {
+	attacker.kills += 1;
 
-		const byName = attacker.name || id4(attacker.id);
-		const toWs = Array.from(sockets.entries()).find(([, pid]) => pid === target.id)?.[0];
-		if (toWs) send(toWs, { t: "dead", byName });
-	}
+	broadcast({ t: "hit", from: attacker.id, to: attacker.id, hp: attacker.hp, maxHp: attacker.maxHp });
+
+	const byName = attacker.name || id4(attacker.id);
+	const toWs = Array.from(sockets.entries()).find(([, pid]) => pid === target.id)?.[0];
+	if (toWs) send(toWs, { t: "dead", byName });
 }
 
 function getPlayerFromWs(ws: any) {
@@ -162,6 +164,7 @@ wss.on("connection", (ws) => {
 		hp: 10000,
 		maxHp: 10000,
 		level: 1,
+		kills: 0,
 		killsInLevel: 0,
 		killsNeeded: LEVEL_DMG_START,
 		damage: 0,
@@ -187,6 +190,7 @@ wss.on("connection", (ws) => {
 		hp: p.hp,
 		maxHp: p.maxHp,
 		level: p.level,
+		kills: p.kills,
 		killsInLevel: p.killsInLevel,
 		killsNeeded: p.killsNeeded
 	});

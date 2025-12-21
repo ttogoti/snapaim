@@ -15,7 +15,7 @@ const SPEED_PENALTY_DMG = 4999;
 const SPEED_PENALTY_COOLDOWN_MS = 2000;
 const MAXHP_STEP = 5000;
 const STALE_MS = 6000;
-const LEVEL_DMG_START = 30000;
+const LEVEL_DMG_START = 10000;
 function now() {
     return Date.now();
 }
@@ -77,203 +77,206 @@ function applyDamage(attacker, target, dmg, combo, fromId) {
         combo
     });
     if (target.hp <= 0) {
+        attacker.kills += 1;
         broadcast({ t: "hit", from: attacker.id, to: attacker.id, hp: attacker.hp, maxHp: attacker.maxHp });
         const byName = attacker.name || id4(attacker.id);
         const toWs = Array.from(sockets.entries()).find(([, pid]) => pid === target.id)?.[0];
         if (toWs)
             send(toWs, { t: "dead", byName });
     }
-}
-function getPlayerFromWs(ws) {
-    const id = sockets.get(ws);
-    if (!id)
-        return null;
-    return players.get(id) || null;
-}
-function removeByWs(ws) {
-    const pid = sockets.get(ws);
-    if (!pid)
-        return;
-    sockets.delete(ws);
-    players.delete(pid);
-}
-function rngInt(a, b) {
-    const lo = Math.min(a, b);
-    const hi = Math.max(a, b);
-    return lo + Math.floor(Math.random() * (hi - lo + 1));
-}
-wss.on("connection", (ws) => {
-    const id = crypto.randomBytes(8).toString("hex");
-    const t = now();
-    const p = {
-        id,
-        name: id4(id),
-        x: 0,
-        y: 0,
-        bx: 0,
-        by: 0,
-        hp: 10000,
-        maxHp: 10000,
-        level: 1,
-        killsInLevel: 0,
-        killsNeeded: LEVEL_DMG_START,
-        damage: 0,
-        lastMoveT: t,
-        lastMoveX: 0,
-        lastMoveY: 0,
-        speed: 0,
-        lastSpeedPenaltyT: 0,
-        lastSeen: t,
-        comboBase: 0,
-        comboMult: 1
-    };
-    players.set(id, p);
-    sockets.set(ws, id);
-    send(ws, {
-        t: "welcome",
-        id,
-        hitRadius: HIT_RADIUS,
-        speedMax: SPEED_MAX,
-        roomCount: players.size,
-        hp: p.hp,
-        maxHp: p.maxHp,
-        level: p.level,
-        killsInLevel: p.killsInLevel,
-        killsNeeded: p.killsNeeded
-    });
-    ws.on("message", (buf) => {
-        let msg;
-        try {
-            msg = JSON.parse(String(buf));
-        }
-        catch {
-            return;
-        }
-        const type = msg?.t ?? msg?.type;
-        const me = getPlayerFromWs(ws);
-        if (!me)
-            return;
-        me.lastSeen = now();
-        if (type === "setName") {
-            me.name = safeName(msg?.name);
-            return;
-        }
-        if (type === "move") {
-            const x = Number(msg?.x);
-            const y = Number(msg?.y);
-            const bx = Number(msg?.bx);
-            const by = Number(msg?.by);
-            if (!isFinite(x) || !isFinite(y))
-                return;
-            const tNow = now();
-            const dt = Math.max(1, tNow - me.lastMoveT);
-            const dx = x - me.lastMoveX;
-            const dy = y - me.lastMoveY;
-            const dist = Math.hypot(dx, dy);
-            me.speed = (dist / dt) * 1000;
-            me.lastMoveT = tNow;
-            me.lastMoveX = x;
-            me.lastMoveY = y;
-            me.x = x;
-            me.y = y;
-            if (isFinite(bx))
-                me.bx = bx;
-            if (isFinite(by))
-                me.by = by;
-            return;
-        }
-        if (type === "speeding") {
-            const tNow = now();
-            if (tNow - me.lastSpeedPenaltyT < SPEED_PENALTY_COOLDOWN_MS)
-                return;
-            me.lastSpeedPenaltyT = tNow;
-            me.hp = Math.max(0, me.hp - SPEED_PENALTY_DMG);
-            broadcast({ t: "hit", from: "speed", to: me.id, hp: me.hp, maxHp: me.maxHp });
-            if (me.hp <= 0) {
-                send(ws, { t: "dead", byName: "Speed" });
-            }
-            return;
-        }
-        if (type === "click") {
-            const x = Number(msg?.x);
-            const y = Number(msg?.y);
-            if (!isFinite(x) || !isFinite(y))
-                return;
-            let best = null;
-            let bestD = Infinity;
-            for (const other of players.values()) {
-                if (other.id === me.id)
-                    continue;
-                if (other.hp <= 0)
-                    continue;
-                const d = Math.hypot(other.x - x, other.y - y);
-                if (d <= HIT_RADIUS && d < bestD) {
-                    bestD = d;
-                    best = other;
-                }
-            }
-            if (!best) {
-                me.comboBase = 0;
-                me.comboMult = 1;
-                return;
-            }
-            if (me.comboBase <= 0)
-                me.comboBase = rngInt(250, 300);
-            me.comboMult = Math.max(2, me.comboMult * 2);
-            const dmg = me.comboBase * me.comboMult;
-            applyDamage(me, best, dmg, me.comboMult);
-            return;
-        }
-    });
-    ws.on("close", () => {
-        removeByWs(ws);
-    });
-    ws.on("error", () => {
-        removeByWs(ws);
-    });
-});
-setInterval(() => {
-    const list = Array.from(players.values()).map((p) => ({
-        id: p.id,
-        name: p.name,
-        x: p.x,
-        y: p.y,
-        bx: p.bx,
-        by: p.by,
-        hp: p.hp,
-        maxHp: p.maxHp,
-        level: p.level,
-        killsInLevel: p.killsInLevel,
-        killsNeeded: p.killsNeeded,
-        damage: p.damage
-    }));
-    broadcast({
-        t: "state",
-        roomCount: players.size,
-        players: list,
-        leaderboard: leaderboardTop10()
-    });
-}, 50);
-setInterval(() => {
-    const tNow = now();
-    for (const [ws, pid] of sockets.entries()) {
-        const p = players.get(pid);
-        if (!p) {
-            try {
-                ws.terminate?.();
-            }
-            catch { }
-            sockets.delete(ws);
-            continue;
-        }
-        if (tNow - p.lastSeen > STALE_MS) {
-            players.delete(pid);
-            sockets.delete(ws);
-            try {
-                ws.terminate?.();
-            }
-            catch { }
-        }
+    function getPlayerFromWs(ws) {
+        const id = sockets.get(ws);
+        if (!id)
+            return null;
+        return players.get(id) || null;
     }
-}, 1500);
-server.listen(PORT);
+    function removeByWs(ws) {
+        const pid = sockets.get(ws);
+        if (!pid)
+            return;
+        sockets.delete(ws);
+        players.delete(pid);
+    }
+    function rngInt(a, b) {
+        const lo = Math.min(a, b);
+        const hi = Math.max(a, b);
+        return lo + Math.floor(Math.random() * (hi - lo + 1));
+    }
+    wss.on("connection", (ws) => {
+        const id = crypto.randomBytes(8).toString("hex");
+        const t = now();
+        const p = {
+            id,
+            name: id4(id),
+            x: 0,
+            y: 0,
+            bx: 0,
+            by: 0,
+            hp: 10000,
+            maxHp: 10000,
+            level: 1,
+            kills: 0,
+            killsInLevel: 0,
+            killsNeeded: LEVEL_DMG_START,
+            damage: 0,
+            lastMoveT: t,
+            lastMoveX: 0,
+            lastMoveY: 0,
+            speed: 0,
+            lastSpeedPenaltyT: 0,
+            lastSeen: t,
+            comboBase: 0,
+            comboMult: 1
+        };
+        players.set(id, p);
+        sockets.set(ws, id);
+        send(ws, {
+            t: "welcome",
+            id,
+            hitRadius: HIT_RADIUS,
+            speedMax: SPEED_MAX,
+            roomCount: players.size,
+            hp: p.hp,
+            maxHp: p.maxHp,
+            level: p.level,
+            kills: p.kills,
+            killsInLevel: p.killsInLevel,
+            killsNeeded: p.killsNeeded
+        });
+        ws.on("message", (buf) => {
+            let msg;
+            try {
+                msg = JSON.parse(String(buf));
+            }
+            catch {
+                return;
+            }
+            const type = msg?.t ?? msg?.type;
+            const me = getPlayerFromWs(ws);
+            if (!me)
+                return;
+            me.lastSeen = now();
+            if (type === "setName") {
+                me.name = safeName(msg?.name);
+                return;
+            }
+            if (type === "move") {
+                const x = Number(msg?.x);
+                const y = Number(msg?.y);
+                const bx = Number(msg?.bx);
+                const by = Number(msg?.by);
+                if (!isFinite(x) || !isFinite(y))
+                    return;
+                const tNow = now();
+                const dt = Math.max(1, tNow - me.lastMoveT);
+                const dx = x - me.lastMoveX;
+                const dy = y - me.lastMoveY;
+                const dist = Math.hypot(dx, dy);
+                me.speed = (dist / dt) * 1000;
+                me.lastMoveT = tNow;
+                me.lastMoveX = x;
+                me.lastMoveY = y;
+                me.x = x;
+                me.y = y;
+                if (isFinite(bx))
+                    me.bx = bx;
+                if (isFinite(by))
+                    me.by = by;
+                return;
+            }
+            if (type === "speeding") {
+                const tNow = now();
+                if (tNow - me.lastSpeedPenaltyT < SPEED_PENALTY_COOLDOWN_MS)
+                    return;
+                me.lastSpeedPenaltyT = tNow;
+                me.hp = Math.max(0, me.hp - SPEED_PENALTY_DMG);
+                broadcast({ t: "hit", from: "speed", to: me.id, hp: me.hp, maxHp: me.maxHp });
+                if (me.hp <= 0) {
+                    send(ws, { t: "dead", byName: "Speed" });
+                }
+                return;
+            }
+            if (type === "click") {
+                const x = Number(msg?.x);
+                const y = Number(msg?.y);
+                if (!isFinite(x) || !isFinite(y))
+                    return;
+                let best = null;
+                let bestD = Infinity;
+                for (const other of players.values()) {
+                    if (other.id === me.id)
+                        continue;
+                    if (other.hp <= 0)
+                        continue;
+                    const d = Math.hypot(other.x - x, other.y - y);
+                    if (d <= HIT_RADIUS && d < bestD) {
+                        bestD = d;
+                        best = other;
+                    }
+                }
+                if (!best) {
+                    me.comboBase = 0;
+                    me.comboMult = 1;
+                    return;
+                }
+                if (me.comboBase <= 0)
+                    me.comboBase = rngInt(250, 300);
+                me.comboMult = Math.max(2, me.comboMult * 2);
+                const dmg = me.comboBase * me.comboMult;
+                applyDamage(me, best, dmg, me.comboMult);
+                return;
+            }
+        });
+        ws.on("close", () => {
+            removeByWs(ws);
+        });
+        ws.on("error", () => {
+            removeByWs(ws);
+        });
+    });
+    setInterval(() => {
+        const list = Array.from(players.values()).map((p) => ({
+            id: p.id,
+            name: p.name,
+            x: p.x,
+            y: p.y,
+            bx: p.bx,
+            by: p.by,
+            hp: p.hp,
+            maxHp: p.maxHp,
+            level: p.level,
+            killsInLevel: p.killsInLevel,
+            killsNeeded: p.killsNeeded,
+            damage: p.damage
+        }));
+        broadcast({
+            t: "state",
+            roomCount: players.size,
+            players: list,
+            leaderboard: leaderboardTop10()
+        });
+    }, 50);
+    setInterval(() => {
+        const tNow = now();
+        for (const [ws, pid] of sockets.entries()) {
+            const p = players.get(pid);
+            if (!p) {
+                try {
+                    ws.terminate?.();
+                }
+                catch { }
+                sockets.delete(ws);
+                continue;
+            }
+            if (tNow - p.lastSeen > STALE_MS) {
+                players.delete(pid);
+                sockets.delete(ws);
+                try {
+                    ws.terminate?.();
+                }
+                catch { }
+            }
+        }
+    }, 1500);
+    server.listen(PORT);
+}
