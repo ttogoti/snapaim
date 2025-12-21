@@ -15,13 +15,7 @@ const SPEED_PENALTY_DMG = 4999;
 const SPEED_PENALTY_COOLDOWN_MS = 2000;
 const MAXHP_STEP = 5000;
 const STALE_MS = 6000;
-const LEVEL_DMG_START = 10000;
-const TILE_SIZE = 40;
-const BASE_RANGE = 110;
-function rangeForLevel(level) {
-    const lv = Math.max(1, Math.floor(level));
-    return BASE_RANGE + (lv - 1) * TILE_SIZE;
-}
+const LEVEL_DMG_START = 30000;
 function now() {
     return Date.now();
 }
@@ -46,7 +40,7 @@ function broadcast(obj) {
     }
 }
 function leaderboardTop10() {
-    const arr = Array.from(players.values()).map(p => ({
+    const arr = Array.from(players.values()).map((p) => ({
         id: p.id,
         name: p.name || id4(p.id),
         damage: p.damage
@@ -60,7 +54,7 @@ function applyDamageProgress(attacker, dealt) {
         const pct = attacker.maxHp > 0 ? attacker.hp / attacker.maxHp : 1;
         attacker.killsInLevel -= attacker.killsNeeded;
         attacker.level += 1;
-        attacker.killsNeeded = Math.max(1, Math.round(attacker.killsNeeded * 1.5));
+        attacker.killsNeeded = Math.max(1, Math.ceil(attacker.killsNeeded * 1.5));
         attacker.maxHp += MAXHP_STEP;
         attacker.hp = Math.max(1, Math.round(pct * attacker.maxHp));
     }
@@ -73,15 +67,21 @@ function applyDamage(attacker, target, dmg, combo, fromId) {
     target.hp = Math.max(0, before - applied);
     attacker.damage += applied;
     applyDamageProgress(attacker, applied);
-    broadcast({ t: "hit", from: fromId ?? attacker.id, to: target.id, hp: target.hp, maxHp: target.maxHp, dmg: applied, combo });
+    broadcast({
+        t: "hit",
+        from: fromId ?? attacker.id,
+        to: target.id,
+        hp: target.hp,
+        maxHp: target.maxHp,
+        dmg: applied,
+        combo
+    });
     if (target.hp <= 0) {
         broadcast({ t: "hit", from: attacker.id, to: attacker.id, hp: attacker.hp, maxHp: attacker.maxHp });
-        const killerName = attacker.name || id4(attacker.id);
-        const victimName = target.name || id4(target.id);
-        broadcast({ t: "kill", killerName, victimName });
+        const byName = attacker.name || id4(attacker.id);
         const toWs = Array.from(sockets.entries()).find(([, pid]) => pid === target.id)?.[0];
         if (toWs)
-            send(toWs, { t: "dead", byName: killerName });
+            send(toWs, { t: "dead", byName });
     }
 }
 function getPlayerFromWs(ws) {
@@ -110,6 +110,8 @@ wss.on("connection", (ws) => {
         name: id4(id),
         x: 0,
         y: 0,
+        bx: 0,
+        by: 0,
         hp: 10000,
         maxHp: 10000,
         level: 1,
@@ -159,15 +161,10 @@ wss.on("connection", (ws) => {
         if (type === "move") {
             const x = Number(msg?.x);
             const y = Number(msg?.y);
+            const bx = Number(msg?.bx);
+            const by = Number(msg?.by);
             if (!isFinite(x) || !isFinite(y))
                 return;
-            const r = rangeForLevel(me.level);
-            const dFromMe = Math.hypot(x - me.x, y - me.y);
-            if (dFromMe > r) {
-                me.comboBase = 0;
-                me.comboMult = 1;
-                return;
-            }
             const tNow = now();
             const dt = Math.max(1, tNow - me.lastMoveT);
             const dx = x - me.lastMoveX;
@@ -179,6 +176,10 @@ wss.on("connection", (ws) => {
             me.lastMoveY = y;
             me.x = x;
             me.y = y;
+            if (isFinite(bx))
+                me.bx = bx;
+            if (isFinite(by))
+                me.by = by;
             return;
         }
         if (type === "speeding") {
@@ -232,11 +233,13 @@ wss.on("connection", (ws) => {
     });
 });
 setInterval(() => {
-    const list = Array.from(players.values()).map(p => ({
+    const list = Array.from(players.values()).map((p) => ({
         id: p.id,
         name: p.name,
         x: p.x,
         y: p.y,
+        bx: p.bx,
+        by: p.by,
         hp: p.hp,
         maxHp: p.maxHp,
         level: p.level,

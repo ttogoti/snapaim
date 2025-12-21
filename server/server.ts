@@ -7,6 +7,8 @@ type Player = {
 	name: string;
 	x: number;
 	y: number;
+	bx: number;
+	by: number;
 	hp: number;
 	maxHp: number;
 	level: number;
@@ -45,14 +47,7 @@ const MAXHP_STEP = 5000;
 
 const STALE_MS = 6000;
 
-const LEVEL_DMG_START = 10000;
-const TILE_SIZE = 40;
-const BASE_RANGE = 110;
-
-function rangeForLevel(level: number) {
-	const lv = Math.max(1, Math.floor(level));
-	return BASE_RANGE + (lv - 1) * TILE_SIZE;
-}
+const LEVEL_DMG_START = 30000;
 
 function now() {
 	return Date.now();
@@ -81,7 +76,7 @@ function broadcast(obj: any) {
 }
 
 function leaderboardTop10() {
-	const arr = Array.from(players.values()).map(p => ({
+	const arr = Array.from(players.values()).map((p) => ({
 		id: p.id,
 		name: p.name || id4(p.id),
 		damage: p.damage
@@ -98,7 +93,7 @@ function applyDamageProgress(attacker: Player, dealt: number) {
 
 		attacker.killsInLevel -= attacker.killsNeeded;
 		attacker.level += 1;
-		attacker.killsNeeded = Math.max(1, Math.round(attacker.killsNeeded * 1.5));
+		attacker.killsNeeded = Math.max(1, Math.ceil(attacker.killsNeeded * 1.5));
 
 		attacker.maxHp += MAXHP_STEP;
 		attacker.hp = Math.max(1, Math.round(pct * attacker.maxHp));
@@ -115,18 +110,22 @@ function applyDamage(attacker: Player, target: Player, dmg: number, combo: numbe
 
 	applyDamageProgress(attacker, applied);
 
-	broadcast({ t: "hit", from: fromId ?? attacker.id, to: target.id, hp: target.hp, maxHp: target.maxHp, dmg: applied, combo });
+	broadcast({
+		t: "hit",
+		from: fromId ?? attacker.id,
+		to: target.id,
+		hp: target.hp,
+		maxHp: target.maxHp,
+		dmg: applied,
+		combo
+	});
 
 	if (target.hp <= 0) {
 		broadcast({ t: "hit", from: attacker.id, to: attacker.id, hp: attacker.hp, maxHp: attacker.maxHp });
 
-		const killerName = attacker.name || id4(attacker.id);
-		const victimName = target.name || id4(target.id);
-
-		broadcast({ t: "kill", killerName, victimName });
-
+		const byName = attacker.name || id4(attacker.id);
 		const toWs = Array.from(sockets.entries()).find(([, pid]) => pid === target.id)?.[0];
-		if (toWs) send(toWs, { t: "dead", byName: killerName });
+		if (toWs) send(toWs, { t: "dead", byName });
 	}
 }
 
@@ -158,6 +157,8 @@ wss.on("connection", (ws) => {
 		name: id4(id),
 		x: 0,
 		y: 0,
+		bx: 0,
+		by: 0,
 		hp: 10000,
 		maxHp: 10000,
 		level: 1,
@@ -192,7 +193,11 @@ wss.on("connection", (ws) => {
 
 	ws.on("message", (buf) => {
 		let msg: any;
-		try { msg = JSON.parse(String(buf)); } catch { return; }
+		try {
+			msg = JSON.parse(String(buf));
+		} catch {
+			return;
+		}
 
 		const type = msg?.t ?? msg?.type;
 		const me = getPlayerFromWs(ws);
@@ -208,14 +213,11 @@ wss.on("connection", (ws) => {
 		if (type === "move") {
 			const x = Number(msg?.x);
 			const y = Number(msg?.y);
+
+			const bx = Number(msg?.bx);
+			const by = Number(msg?.by);
+
 			if (!isFinite(x) || !isFinite(y)) return;
-			const r = rangeForLevel(me.level);
-			const dFromMe = Math.hypot(x - me.x, y - me.y);
-			if (dFromMe > r) {
-				me.comboBase = 0;
-				me.comboMult = 1;
-				return;
-			}
 
 			const tNow = now();
 			const dt = Math.max(1, tNow - me.lastMoveT);
@@ -231,6 +233,9 @@ wss.on("connection", (ws) => {
 
 			me.x = x;
 			me.y = y;
+
+			if (isFinite(bx)) me.bx = bx;
+			if (isFinite(by)) me.by = by;
 
 			return;
 		}
@@ -295,11 +300,13 @@ wss.on("connection", (ws) => {
 });
 
 setInterval(() => {
-	const list = Array.from(players.values()).map(p => ({
+	const list = Array.from(players.values()).map((p) => ({
 		id: p.id,
 		name: p.name,
 		x: p.x,
 		y: p.y,
+		bx: p.bx,
+		by: p.by,
 		hp: p.hp,
 		maxHp: p.maxHp,
 		level: p.level,
@@ -322,7 +329,9 @@ setInterval(() => {
 	for (const [ws, pid] of sockets.entries()) {
 		const p = players.get(pid);
 		if (!p) {
-			try { ws.terminate?.(); } catch {}
+			try {
+				ws.terminate?.();
+			} catch {}
 			sockets.delete(ws);
 			continue;
 		}
@@ -330,7 +339,9 @@ setInterval(() => {
 		if (tNow - p.lastSeen > STALE_MS) {
 			players.delete(pid);
 			sockets.delete(ws);
-			try { ws.terminate?.(); } catch {}
+			try {
+				ws.terminate?.();
+			} catch {}
 		}
 	}
 }, 1500);
